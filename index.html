@@ -760,8 +760,13 @@ body{
   width:calc(var(--pw) + var(--gap));flex:0 0 calc(var(--pw) + var(--gap));
   margin-left:calc(var(--gap) / -2);margin-right:calc(var(--gap) / -2);
   height:100%;position:relative;border-radius:0;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(6px * var(--u));
-  padding:calc(8px * var(--u)) calc(4px * var(--u));overflow:hidden;
+  /* container-type:size 讓格內元素可以用 cqh／cqw 直接量到「這一格」的尺寸。
+     直排的字級必須由格高決定（字數越多字要越小才塞得下），而格高是 #reelWrap
+     高度的 100%、又是視窗高的 34.24%，用 --u 換算會脫鉤——--u 夾在 0.45～1.25，
+     格寬卻是依視窗寬分 11 等份，兩者在偏方的比例下差很多。 */
+  container-type:size;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(4px * var(--u));
+  padding:calc(6px * var(--u)) calc(4px * var(--u));overflow:hidden;
   /* 格子本身不再有底色，露出的是 #reelWrap 那張連續紙面。
      原本那道 inset 白色高光也一併拿掉——每格各鋪一次，在連續底板上會變成
      一條條等距的直向亮帶，等於把剛取消掉的色塊邊界換個形式長回來。 */
@@ -772,32 +777,57 @@ body{
 .coinIco{display:inline-block;width:1.3em;height:1.3em;vertical-align:-.3em;
   margin-right:.32em;background:center center / contain no-repeat;
   filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))}
-.coinIco.ic-星幣{background-image:var(--coinStar)}
-.coinIco.ic-銀幣{background-image:var(--coinSilver)}
-.coinIco.ic-銅幣{background-image:var(--coinBronze)}
+.ic-星幣{background-image:var(--coinStar)}
+.ic-銀幣{background-image:var(--coinSilver)}
+.ic-銅幣{background-image:var(--coinBronze)}
 
 /* 獎項格內的字級一律 +2px（10→12、15→17）。
    幣種圖示 .coinIco 的尺寸寫成 1.3em，是跟著所在文字的字級走的，
    所以字一放大它就等比跟上，不必另外調。 */
+/* (1) 幣種圖示：從原本 .cat 膠囊裡的行內小圖示獨立出來，單獨佔最上面一行。
+   尺寸取 min(格寬的 40%, 格高的 19%)，寬扁或窄長的格子都不會被撐爆。 */
+.panel .pico{
+  flex:none;width:min(40cqw, 19cqh);aspect-ratio:1;
+  /* 用長寫不用 background 簡寫：簡寫會把 .ic-星幣／.ic-銀幣／.ic-銅幣 設的
+     background-image 一起重設成 none，而這條規則的優先序又比那三條高。 */
+  background-position:center center;background-size:contain;background-repeat:no-repeat;
+  filter:drop-shadow(0 1px calc(2px * var(--u)) rgba(0,0,0,.55));
+}
+/* (2) 幣別：直排、外加一個方框，對照參考圖的「星／幣」。
+   ── 為什麼不用 writing-mode:vertical-rl ──
+   那才是直排的正規寫法，但本檔內嵌的字型子集沒有帶垂直排版用的度量表（vhea／vmtx），
+   Chrome 在垂直書寫模式下算不出中文字的縱向前進量，整欄高度會塌成 0
+   （數字因為會 fallback 到系統字型反而正常，只有中文塌掉，很容易誤判成排版寫錯）。
+   所以改成逐字包 <span> 疊在 flex 直欄裡：高度由每個 span 的行框相加得出，
+   完全不依賴字型的垂直度量。 */
 .panel .cat{
-  flex:none;font-size:calc(12px * var(--u));letter-spacing:.1em;
-  padding:1px calc(6px * var(--u));border-radius:2px;white-space:nowrap;
-  background:rgba(58,32,10,.80);color:rgba(255,244,222,.95);
+  flex:none;display:flex;flex-direction:column;align-items:center;
+  font-size:min(calc(13px * var(--u)), 9cqh);
+  font-weight:700;line-height:1;
+  padding:calc(3px * var(--u)) calc(3px * var(--u));
+  border:max(1px, calc(1.5px * var(--u))) solid rgba(58,32,10,.85);
+  border-radius:calc(2px * var(--u));
+  color:#3A2205;background:rgba(255,250,235,.30);
 }
-/* 金額字級除了跟 --u 走，還多壓一道以「格寬」為準的上限。
-   原因：--u 是依視窗高度算的，格寬卻是依寬度分 11 等份，兩者不同步。
-   在 1024x768 這種偏方的比例下 --u 已經到 1.16，格子卻只有 88px，
-   17px x 1.16 = 19.8px 排「2,000,000」正好差幾 px 塞不下，
-   word-break:break-all 會從數字中間硬斷成兩行（「2,000,0 / 00」）。
-   4.6 是最長字串的實測寬度（7 個數字 x 0.55em + 2 個逗號 x 0.28em ≒ 4.41em，再留一點餘裕）。
-   其餘尺寸下這道上限都不會生效，字級仍是 17px x --u。 */
-.panel .val{
-  flex:none;font-weight:800;line-height:1.15;text-align:center;word-break:break-all;
-  font-size:min(calc(17px * var(--u)),
-                calc((var(--pw) + var(--gap) - 8px * var(--u)) / 4.6));
+/* 彩金格的 .cat 放的是 MINI／MINOR／MAJOR／GRAND，直排會變成一個字母一行、
+   GRAND 就佔掉五行，所以這一種改回橫排。 */
+.panel.c-jp .cat{
+  flex-direction:row;letter-spacing:.1em;
+  font-size:min(calc(11px * var(--u)), 7cqh);
 }
-.panel .name{flex:none;display:flex;flex-direction:column;align-items:center;gap:calc(2px * var(--u));
-  font-size:calc(17px * var(--u));font-weight:700;line-height:1}
+/* (3) 金額／道具卡名：直排，一個字元一行。
+   字級 = min(上限, 可用格高 ÷ 字數)。--n 由 panelHTML 依實際字數帶進來，
+   所以「500」會用滿上限、「2000000」會自動縮到剛好塞得下，不會溢出也不會截斷。
+   52cqh 是扣掉圖示、幣別方框與三道間距之後剩給這一欄的高度。 */
+.panel .val,
+.panel .name{
+  flex:none;display:flex;flex-direction:column;align-items:center;
+  line-height:1;
+  font-size:min(calc(26px * var(--u)), calc(50cqh / var(--n)));
+}
+.panel .val{font-weight:800}
+.panel .name{font-weight:700;font-size:min(calc(21px * var(--u)), calc(50cqh / var(--n)))}
+
 /* c-star / c-silver / c-copper / c-card 四個色塊類別已經不再帶底色。
    類別本身保留（JS 仍會掛上去，獎項總表也吃同一組命名），只是在轉盤上不再上色，
    幣種改由 .cat 那顆膠囊裡的圖示與名稱來辨識。 */
@@ -1915,12 +1945,21 @@ const jpPrize = t => {
 };
 
 const coinIco = cat => CURRENCY.has(cat) ? `<i class="coinIco ic-${cat}" aria-hidden="true"></i>` : "";
+/* 格內排列（對照參考圖，由上而下）：幣種圖示 → 幣別方框 → 金額直排。
+   金額不加千分位逗號：直排時逗號會自己佔掉一整行，而且會讓字數從 7 變成 9、
+   字級被迫再縮一階。參考圖的「5000」也是不帶逗號的。
+   --n 是這一欄的字元數，交給 CSS 去算字級（見 .val / .name）。
+   逐字包 <span> 是必要的，不是多此一舉——原因見 .panel .cat 的註解。 */
 const panelHTML = p => {
   const card = CARD_OF(p);
-  return `<div class="cat">${p.jp ? p.jp : coinIco(p.cat) + p.cat}</div>` + (
-    p.cat === "道具卡"
-      ? `<div class="name">${[...p.name].map(c => `<span>${c}</span>`).join("")}</div>`
-      : `<div class="val">${fmt(p.qty)}</div>`)
+  const cur  = CURRENCY.has(p.cat);
+  const qty  = String(p.qty);
+  const col  = t => [...t].map(c => `<span>${c}</span>`).join("");
+  return (cur ? `<i class="pico ic-${p.cat}" aria-hidden="true"></i>` : "")
+    + `<div class="cat">${col(p.jp ? p.jp : p.cat)}</div>`
+    + (cur
+        ? `<div class="val" style="--n:${qty.length}">${col(qty)}</div>`
+        : `<div class="name" style="--n:${p.name.length}">${col(p.name)}</div>`)
     + (card ? `<i class="pcard" style="--pcImg:${card}" aria-hidden="true"></i>` : "");
 };
 
