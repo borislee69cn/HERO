@@ -135,12 +135,25 @@ body{
   position:fixed;inset:0;overflow:hidden;
   background:var(--bgImg) center center / cover no-repeat, #060D09;
 }
+/* ---------- iPhone 動態島／瀏海／Home 指示條 安全區 ----------
+   背景仍然滿版鋪到螢幕邊（#stage 不內縮），只有內容層 #board 讓開安全區，
+   所以不會出現黑邊，也不會有 UI 被動態島吃掉。
+   env() 只能寫在 CSS，這支探針把四邊安全距離擺進 padding，讓 layout() 讀得到實際 px。 */
+#safeProbe{
+  position:fixed;left:0;top:0;width:0;height:0;
+  visibility:hidden;pointer-events:none;z-index:-1;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-right:env(safe-area-inset-right,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:env(safe-area-inset-left,0px);
+}
 /* 背景維持原圖亮度，不加壓暗層 */
 /* 版面基準框：寬高一律吃 layout() 算出的 px，不吃 position:fixed 的 100% 繼承鏈。
    部分行動端 webview（含 App 內嵌預覽）對 fixed 元素回報的可視區大小與 innerWidth/
    innerHeight 不一致，會讓「% 版面」與「px 版面」各自算出不同基準而錯位。 */
 #board{
-  position:absolute;left:0;top:0;width:var(--bw, 100%);height:var(--bh, 100%);
+  position:absolute;left:var(--sal, 0px);top:var(--sat, 0px);
+  width:var(--bw, 100%);height:var(--bh, 100%);
   --frT:calc(9px * var(--u));   /* 獎項表金屬外框的厚度，天數表要讓開這一段 */
 }
 
@@ -910,7 +923,9 @@ body{
 
 /* ---------- 彈窗 ---------- */
 .overlay{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
-  background:rgba(3,8,5,.82);backdrop-filter:blur(3px);padding:2vh 2vw}
+  background:rgba(3,8,5,.82);backdrop-filter:blur(3px);
+  padding:calc(2vh + env(safe-area-inset-top,0px)) calc(2vw + env(safe-area-inset-right,0px))
+          calc(2vh + env(safe-area-inset-bottom,0px)) calc(2vw + env(safe-area-inset-left,0px))}
 .overlay.show{display:flex;animation:fadeIn .25s ease-out}
 @keyframes fadeIn{from{opacity:0}}
 .sheet{width:min(94vw, calc(600px * var(--u)));max-height:92vh;display:flex;flex-direction:column;
@@ -1005,7 +1020,7 @@ body{
 
 /* 直式提示 */
 #rotate{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;
-  align-items:center;justify-content:center;gap:18px;background:rgba(4,10,7,.94);text-align:center}
+  align-items:center;justify-content:center;gap:18px;background:rgba(4,10,7,.94);text-align:center;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 #rotate.show{display:flex}
 #rotate .ico{font-size:52px;animation:rot 2.4s ease-in-out infinite}
 @keyframes rot{0%,40%{transform:rotate(0)}60%,100%{transform:rotate(90deg)}}
@@ -1018,6 +1033,8 @@ body{
 </style>
 </head>
 <body>
+
+<i id="safeProbe" aria-hidden="true"></i>
 
 <div id="stage">
  <div id="board">
@@ -1291,8 +1308,27 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 const raf2 = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
 /* ---- 版面計算（全螢幕自適應） ---- */
+/* 安全區讀取。
+   SAFE_SYMMETRIC = true：左右取兩側較大值，版面永遠置中；
+   iPhone 橫放時動態島只在其中一側，若只縮那一側，轉向就會整個版面左右跳動。
+   若想把另一側的空間也用滿（版面偏一邊），把它改成 false 即可。 */
+const SAFE_SYMMETRIC = true;
+function safeInsets(){
+  const p = document.getElementById("safeProbe");
+  if (!p) return { t:0, r:0, b:0, l:0 };
+  const cs = getComputedStyle(p);
+  const n  = v => Math.max(0, Math.round(parseFloat(v) || 0));
+  let t = n(cs.paddingTop),    r = n(cs.paddingRight),
+      b = n(cs.paddingBottom), l = n(cs.paddingLeft);
+  if (SAFE_SYMMETRIC){ const side = Math.max(l, r); l = r = side; }
+  return { t, r, b, l };
+}
+
 function layout(){
-  const W = innerWidth, H = innerHeight;
+  const SA = safeInsets();
+  // 版面基準改吃「扣掉安全區之後」的可視範圍，動態島不會壓到任何內容
+  const W = Math.max(320, innerWidth  - SA.l - SA.r);
+  const H = Math.max(240, innerHeight - SA.t - SA.b);
   // 位距與間隙一律取「偶數整數 px」。
   // 原本 pw 是除出來的小數，位距跟著是小數；在高像素密度手機上，瀏覽器會把
   // 分隔光束那張重複底圖的每一格各自四捨五入到整數實體像素，誤差一格一格累積，
@@ -1336,6 +1372,10 @@ function layout(){
   st.setProperty("--pinTop", pinTop + "px");
   st.setProperty("--bw", W + "px");
   st.setProperty("--bh", H + "px");
+  st.setProperty("--sal", SA.l + "px");
+  st.setProperty("--sar", SA.r + "px");
+  st.setProperty("--sat", SA.t + "px");
+  st.setProperty("--sab", SA.b + "px");
   // 彩金框：高 = 彩金列高的 64%，寬依素材比例 463/124，兩者都取整數 px
   const jpH = Math.max(8, Math.round(H * 0.1015 * 0.64));
   st.setProperty("--jpH", jpH + "px");
