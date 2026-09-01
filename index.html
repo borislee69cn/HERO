@@ -1412,6 +1412,32 @@ body{
 #resultOverlay .calc tr.total td{font-size:calc(20px * var(--u))}
 #resultOverlay .note{font-size:calc(15px * var(--u))}
 
+/* ---------- 開場提示窗 ----------
+   進站先擋一層說明，按下「前往參加」才開始跑七天流程。
+   除了介紹玩法，它還順手解決了瀏覽器的自動播放限制：那一下點擊本身就是
+   AudioContext 需要的使用者手勢，音樂正好在進遊戲的同一拍起播，
+   不必再等玩家隨便點到畫面某處才有聲音。 */
+#introSheet{width:min(92vw, calc(500px * var(--u)))}
+#introOverlay .sheet-bd{text-align:center}
+/* 主視覺沿用遊戲 LOGO，不另外做素材：這裡要傳達的就是「這是哪個活動」 */
+.intro-art{
+  width:min(72%, calc(300px * var(--u)));aspect-ratio:16 / 7;margin:0 auto;
+  background:var(--logoImg) center center / contain no-repeat;
+  filter:drop-shadow(0 calc(4px * var(--u)) calc(14px * var(--u)) rgba(0,0,0,.7));
+  animation:introBreath 3.6s ease-in-out infinite;
+}
+@keyframes introBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+.intro-lead{
+  margin-top:calc(10px * var(--u));font-size:calc(17px * var(--u));font-weight:800;
+  letter-spacing:.06em;color:#FFF0BE;text-shadow:0 2px 10px rgba(245,197,66,.35);
+}
+.intro-copy{
+  margin-top:calc(9px * var(--u));font-size:calc(13px * var(--u));line-height:1.9;
+  color:#B9CDBE;letter-spacing:.02em;
+}
+.intro-copy b{color:var(--gold);font-weight:800}
+#btnIntroGo{font-size:calc(17px * var(--u));padding:calc(11px * var(--u)) calc(38px * var(--u))}
+
 #tableSheet{width:min(96vw, calc(840px * var(--u)))}
 .prize-table{width:100%;border-collapse:collapse;font-size:calc(12px * var(--u))}
 .prize-table th{position:sticky;top:0;background:#16301F;padding:calc(6px * var(--u)) calc(8px * var(--u));
@@ -1514,6 +1540,18 @@ body{
 
   <div id="toast"></div>
  </div>
+</div>
+
+<div class="overlay" id="introOverlay">
+  <div class="sheet" id="introSheet">
+    <div class="sheet-hd"><h2 class="display-font">七 日 登 入 送</h2><p>連續登入 · 箭無虛發</p></div>
+    <div class="sheet-bd">
+      <div class="intro-art" aria-hidden="true"></div>
+      <p class="intro-lead" id="introLead"></p>
+      <p class="intro-copy" id="introCopy"></p>
+    </div>
+    <div class="sheet-ft"><button class="btn primary" id="btnIntroGo">前 往 參 加</button></div>
+  </div>
 </div>
 
 <div class="overlay" id="resultOverlay">
@@ -2883,6 +2921,32 @@ async function runDay(d, token){
   }
 }
 
+/* 開場說明的文案一律從 CFG 生出來，不寫死：
+   箭數表、彩金解鎖日、自選日只要改 CFG，這裡就跟著變，不會出現說明與實作對不上。 */
+function buildIntro(){
+  const per = CFG.arrowsPerDay;
+  // 把箭數相同的連續天數合併成一段，讀起來才不會是七個逗號串在一起
+  const seg = [];
+  per.forEach((n, i) => {
+    const last = seg[seg.length - 1];
+    if (last && last.n === n) last.days.push(i + 1);
+    else seg.push({ n, days:[i + 1] });
+  });
+  const arrows = seg.map(g => `第 ${g.days.join("、")} 天 <b>${g.n} 箭</b>`).join("，");
+  const jp = Object.keys(CFG.jpUnlockDay)
+    .sort((a, b) => CFG.jpUnlockDay[a] - CFG.jpUnlockDay[b])
+    .map(t => `第 ${CFG.jpUnlockDay[t]} 天 <b>${t}</b>`).join("、");
+  const total = per.reduce((a, b) => a + b, 0);
+
+  $("#introLead").textContent = `今日首次登入，可免費射出 ${per[0]} 箭！`;
+  $("#introCopy").innerHTML =
+      `活動為 <b>${per.length} 天</b>一週期，每日首次登入即可獲得當日箭數：${arrows}，`
+    + `整個週期共 <b>${total} 箭</b>。<br>`
+    + `射中的獎項會再套用你的<b>遊戲等級加成</b>；`
+    + `第 ${CFG.pickDays.join("、")} 天的箭位<b>由你自己挑</b>。<br>`
+    + `彩金依日程逐階解鎖：${jp}，獎勵越來越豐厚。`;
+}
+
 function startRun(){
   S.run++;
   stopIdle();
@@ -2912,8 +2976,16 @@ $("#btnFinalClose").addEventListener("click", () => { $("#finalOverlay").classLi
 $("#btnTable").addEventListener("click", () => $("#tableOverlay").classList.add("show"));
 $("#btnSettings").addEventListener("click", () => $("#settingsOverlay").classList.add("show"));
 $$("[data-close]").forEach(b => b.addEventListener("click", () => $("#"+b.dataset.close).classList.remove("show")));
+/* 開場提示窗和結算／總結一樣，不能點背景關掉——它是進遊戲的唯一入口，
+   點掉了就會停在一個沒有在跑的畫面上。 */
+$("#btnIntroGo").addEventListener("click", () => {
+  $("#introOverlay").classList.remove("show");
+  bgmBoot();                      // 這一下是使用者手勢，AudioContext 現在才 resume 得起來
+  startRun();
+});
 $$(".overlay").forEach(o => o.addEventListener("click", e => {
-  if (e.target === o && o.id !== "resultOverlay" && o.id !== "finalOverlay") o.classList.remove("show");
+  if (e.target === o && !["resultOverlay", "finalOverlay", "introOverlay"].includes(o.id))
+    o.classList.remove("show");
 }));
 addEventListener("keydown", e => {
   if (e.key === "Escape"){
@@ -2927,7 +2999,11 @@ addEventListener("keydown", e => {
    ============================================================ */
 layout();
 buildJP(); buildStreaks(); buildReel(); buildDays(); buildLevelUI(); buildTable(); syncLevel(); syncForceJP();
-startRun();
+/* 進站不直接開跑，先擋一層開場說明；startRun() 交給「前往參加」那顆按鈕觸發。
+   「重新播放」與七日總結的重來仍然直接呼叫 startRun()，不會再看到這一窗。 */
+buildIntro();
+$("#introOverlay").classList.add("show");
+$("#btnIntroGo").focus({ preventScroll:true });
 </script>
 </body>
 </html>
