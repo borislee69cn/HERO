@@ -453,12 +453,30 @@ body{
 #shockWave .swL{right:0;transform-origin:100% 50%;
   background:linear-gradient(270deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 52%,
     var(--swC2) 74%, var(--swC1) 94%, rgba(255,255,255,.85) 100%)}
+/* 三道波，一道比一道晚出發、推得近、也更淡：
+     深（主波）  0ms    scaleX 1     前緣 .80
+     中（sw2）  +110ms  scaleX .74   前緣 .42
+     淺（sw3）  +220ms  scaleX .52   前緣 .22
+   三條前緣依序掃過去，讀起來是被撞出來的一圈圈漣漪，而不是單一道光邊往外拉。
+   標記順序是「淺 → 中 → 深」，所以越淺的畫在越下面，疊起來不會把主波洗掉。 */
+#shockWave .sw2{--swK:.74}
+#shockWave .sw3{--swK:.52}
+#shockWave.on > i.sw2{animation-delay:.11s}
+#shockWave.on > i.sw3{animation-delay:.22s}
+#shockWave .sw2.swR{background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 60%,
+  var(--swD2) 80%, var(--swD1) 96%, rgba(255,255,255,.5) 100%)}
+#shockWave .sw2.swL{background:linear-gradient(270deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 60%,
+  var(--swD2) 80%, var(--swD1) 96%, rgba(255,255,255,.5) 100%)}
+#shockWave .sw3.swR{background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 66%,
+  var(--swE2) 84%, var(--swE1) 97%, rgba(255,255,255,.28) 100%)}
+#shockWave .sw3.swL{background:linear-gradient(270deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 66%,
+  var(--swE2) 84%, var(--swE1) 97%, rgba(255,255,255,.28) 100%)}
 #shockWave.on > i{animation:swOut var(--swDur, 520ms) cubic-bezier(.12,.72,.24,1) forwards}
 @keyframes swOut{
   0%  {opacity:0;  transform:scaleX(.05)}
   10% {opacity:.9}
   55% {opacity:.5}
-  100%{opacity:0;  transform:scaleX(1)}
+  100%{opacity:0;  transform:scaleX(var(--swK, 1))}
 }
 @media (prefers-reduced-motion:reduce){#shockWave{display:none !important}}
 
@@ -1534,29 +1552,6 @@ body{
 .btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .btn.primary{background:linear-gradient(180deg,#C8971C,#7A5A08);color:#22160A;font-weight:800;border-color:#FFE9A8}
 .btn.primary:hover{background:linear-gradient(180deg,#FFDE7A,#B8860B)}
-/* 主要行動鍵的呼吸提亮：外圈金色光暈與整顆亮度一起起伏，把視線帶到「該按這裡」。
-   只掛在「前 往 參 加」與「收 下」這兩顆真正要玩家出手的鍵上，
-   「重 新 播 放」「完 成」維持安靜，避免整個介面到處都在閃。
-   只在滑過時停掉，讓 hover 的回饋不被呼吸蓋過去。
-   刻意不排除 :focus-visible——這顆鍵開窗時會被程式 focus()，
-   排除掉等於呼吸永遠不會播。
-   「領 獎」不走這一套：它改成與「射 擊」共用 firePulse，見 #btnResultClose 那段。 */
-#btnIntroGo{animation:btnBreath 1.8s ease-in-out infinite}
-#btnIntroGo:hover{animation:none}
-@keyframes btnBreath{
-  0%,100%{
-    box-shadow:0 0 0 rgba(255,225,150,0),
-               0 calc(2px * var(--u)) calc(8px * var(--u)) rgba(0,0,0,.35);
-    filter:brightness(1);
-  }
-  50%{
-    box-shadow:0 0 calc(16px * var(--u)) rgba(255,225,150,.75),
-               0 0 calc(34px * var(--u)) rgba(245,197,66,.45),
-               0 calc(2px * var(--u)) calc(8px * var(--u)) rgba(0,0,0,.35);
-    filter:brightness(1.18);
-  }
-}
-@media (prefers-reduced-motion:reduce){#btnIntroGo,#btnResultClose{animation:none}}
 
 .win-hero{text-align:center;padding:calc(10px * var(--u)) 0 calc(12px * var(--u));border-radius:6px;
   margin-bottom:calc(10px * var(--u));
@@ -1599,7 +1594,12 @@ body{
   font-weight:900;line-height:1.1;
   background:linear-gradient(180deg,#FFF8DC 10%,#F5C542 52%,#9A6B12 96%);
   -webkit-background-clip:text;background-clip:text;color:transparent;
-  text-shadow:0 3px 14px rgba(245,197,66,.35)}
+  text-shadow:0 3px 14px rgba(245,197,66,.35);
+  /* 金額與卡名的亮度與呼吸節奏都比照「領 獎」：時長、緩動、延遲與 firePulse 同一組。
+     文字是 background-clip:text 畫出來的漸層，brightness 直接作用在那層漸層上；
+     光暈走 text-shadow，字身雖然是 transparent，陰影仍以字形輪廓算圖。
+     相位對齊靠 showResult() 開窗時把按鍵的動畫一起重跑，見那邊的註解。 */
+  animation:cardPulse 1.5s ease-in-out infinite .4s}
 /* 道具卡名與金額要看起來一樣大，但「一樣大」不等於同一個 font-size：
    中文字身填滿字框，阿拉伯數字只佔約七成的字高（實測本檔字型：數字墨高 0.70em、
    中文墨高 1.00em）。所以卡名字級取數字的 0.70 打底，再依需求 +2px。
@@ -1622,6 +1622,17 @@ body{
   position:relative;
   top:calc(var(--cfs) * .335 - var(--vfs) * .35);
 }
+@keyframes cardPulse{
+  0%,100%{filter:brightness(1);
+    text-shadow:0 3px 14px rgba(245,197,66,.35)}
+  /* 光暈刻意收得比字身還小一圈：擴散半徑從 18px 收到 7px、亮度也降一級。
+     數字本身字級很大（--vfs 最大到 36px x u），18px 的擴散會在字外圍糊出一大團，
+     看起來像數字後面壓了一塊發光板，而不是字自己在呼吸。 */
+  50%    {filter:brightness(1.12);
+    text-shadow:0 3px 14px rgba(245,197,66,.35),
+                0 0 calc(7px * var(--u)) rgba(255,226,140,.6)}
+}
+@media (prefers-reduced-motion:reduce){.win-hero .wval{animation:none}}
 /* 彩金牌的置中槽：grid 第 3 列、欄號由 JS 指定。
    寬度 0 → 對欄寬的貢獻是 0，彩金牌再寬也不會把那一欄撐開；
    內層用 flex 置中，超出的部分左右等量溢出，所以牌子還是對準欄的中心線。 */
@@ -1680,6 +1691,11 @@ body{
    右內距比左內距少 8px 是 #btnFire 原本就有的補償——letter-spacing 會在
    最後一個字後面也留一段空隙，不扣掉的話文字看起來會偏左。
    外觀（金色漸層、立體厚邊、呼吸提亮）維持 .btn.primary 那一套，只對齊尺寸。 */
+/* 「前 往 參 加」與「領 獎」的規格一律對照「射 擊」：
+   尺寸、色度、外框圈、呼吸節奏全部與 #btnFire 同一組值，
+   三顆主要行動鍵在整個流程裡看起來就是同一顆。
+   「重 新 播 放」「完 成」不在此列，維持樸素的 .btn.primary。 */
+#btnIntroGo,
 #btnResultClose{
   position:relative;                 /* ::before 的外框圈要靠它定位 */
   font-family:"Noto Serif TC","Songti TC",serif;
@@ -1694,10 +1710,13 @@ body{
   /* 呼吸也共用 #btnFire 的 firePulse（box-shadow 由那組關鍵影格全權負責） */
   animation:firePulse 1.5s ease-in-out infinite .4s;
 }
+#btnIntroGo:hover,
 #btnResultClose:hover{background:linear-gradient(180deg,#FFFBE0 6%,#FFE288 46%,#F0B41C 100%)}
+#btnIntroGo:active,
 #btnResultClose:active{transform:translateY(calc(2px * var(--u)));
   box-shadow:0 calc(1.5px * var(--u)) 0 #6B4A05;animation:none}
 /* 外框圈：與 #btnFire::before 同一組尺寸與配色，常駐而不是靠 :focus-visible 才出現 */
+#btnIntroGo::before,
 #btnResultClose::before{
   content:"";position:absolute;pointer-events:none;
   inset:calc(-1px - 6px * var(--u));
@@ -1708,7 +1727,9 @@ body{
              0 0 calc(10px * var(--u)) rgba(255,214,100,.45);
   transition:border-color .2s, box-shadow .2s;
 }
+#btnIntroGo:focus-visible,
 #btnResultClose:focus-visible{outline:none}
+#btnIntroGo:focus-visible::before,
 #btnResultClose:focus-visible::before{border-color:#FFFDF0;
   box-shadow:inset 0 0 0 max(2px, calc(2.4px * var(--u))) rgba(46,28,6,.62),
              0 0 calc(16px * var(--u)) rgba(255,230,150,.9)}
@@ -1745,7 +1766,6 @@ body{
   animation:introBreath 3.6s ease-in-out infinite;
 }
 @keyframes introBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
-#btnIntroGo{font-size:calc(17px * var(--u));padding:calc(11px * var(--u)) calc(38px * var(--u))}
 
 #tableSheet{width:min(96vw, calc(840px * var(--u)))}
 .prize-table{width:100%;border-collapse:collapse;font-size:calc(12px * var(--u))}
@@ -1806,7 +1826,7 @@ body{
     <div id="track"></div>
     <i id="beamLayer" class="sepSync" aria-hidden="true"></i>
     <i id="sepLayer"  class="sepSync" aria-hidden="true"></i>
-    <i id="shockWave" aria-hidden="true"><i class="swL"></i><i class="swR"></i></i>
+    <i id="shockWave" aria-hidden="true"><i class="swL sw3"></i><i class="swR sw3"></i><i class="swL sw2"></i><i class="swR sw2"></i><i class="swL"></i><i class="swR"></i></i>
     <i class="sFX" aria-hidden="true">
       <i class="fxWash"></i>
       <i class="fxEdge e-t"></i>
@@ -2853,8 +2873,12 @@ function shockWave(tier, box, ms){
   const wrap = rectOf($("#reelWrap"));
   sw.style.setProperty("--swX", (box.x - wrap.x + box.w / 2).toFixed(1) + "px");
   sw.style.setProperty("--swW", (wrap.w * 0.46).toFixed(1) + "px");
-  sw.style.setProperty("--swC1", beamTint(tier, .8));
-  sw.style.setProperty("--swC2", beamTint(tier, .16));
+  sw.style.setProperty("--swC1", beamTint(tier, .8));    // 深的那道：前緣
+  sw.style.setProperty("--swC2", beamTint(tier, .16));   //           拖尾
+  sw.style.setProperty("--swD1", beamTint(tier, .42));   // 中的那道：亮度約深的一半
+  sw.style.setProperty("--swD2", beamTint(tier, .09));
+  sw.style.setProperty("--swE1", beamTint(tier, .22));   // 淺的那道：再減半
+  sw.style.setProperty("--swE2", beamTint(tier, .05));
   sw.style.setProperty("--swDur", ms + "ms");
   sw.classList.remove("on"); void sw.offsetWidth; sw.classList.add("on");
   clearTimeout(sw._h);
@@ -3262,8 +3286,14 @@ function showResult(results){
   }
   // 說明文字（加成公式／道具卡不加成／彩金比照星幣）整段移除，noteFor() 一併刪掉
   $("#resultBody").innerHTML = body;
+  /* 相位對齊：金額／卡名是這一拍才生成的，動畫從現在起算；
+     而「領 獎」是靜態標記，它的 firePulse 從頁面載入就一直在跑，
+     兩邊的相位差是隨機的——看起來就是「數字亮的時候按鍵在暗」。
+     這裡把按鍵的動畫強制重跑一次，兩者才會從同一個 0% 開始。 */
+  const okBtn = $("#btnResultClose");
+  okBtn.style.animation = "none"; void okBtn.offsetWidth; okBtn.style.animation = "";
   $("#resultOverlay").classList.add("show");
-  $("#btnResultClose").focus({ preventScroll:true });
+  okBtn.focus({ preventScroll:true });
 }
 /* ============================================================
    10. 演出主流程
