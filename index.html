@@ -434,17 +434,24 @@ body{
 }
 
 /* 嵌入獎項表的那一拍：整個獎項表（含金屬外框）被撞得晃一下，幅度逐次衰減 */
-#reelWrap.slam,#reelFrame.slam{animation:reelSlam .5s cubic-bezier(.2,.8,.3,1)}
+/* will-change 只在掛上 .slam 的那 0.5 秒生效：先把兩層拉上合成層，
+   iOS 才不會在第一拍才臨時提升、把最重的那一下吃掉。 */
+#reelWrap.slam,#reelFrame.slam{
+  animation:reelSlam .5s cubic-bezier(.2,.8,.3,1);
+  will-change:transform;
+}
 /* 幅度較初版累計放大 45%（5.2272 = 3.6 × 1.2 × 1.1 × 1.1，其餘各關鍵影格同倍率）。
-   只動幅度、不動時長與衰減比例，撞擊感變重但回穩的節奏和原本一致。 */
+   只動幅度、不動時長與衰減比例，撞擊感變重但回穩的節奏和原本一致。
+   縮放單位用 --su 而不是 --u，理由見 layout() 裡 --su 的註解：
+   --u 在矮視窗上會掉到 0.6 以下，晃幅跟著砍掉快一半，實機只剩輕輕抖一下。 */
 @keyframes reelSlam{
   0%  {transform:translate3d(0,0,0)}
-  7%  {transform:translate3d(0, calc(5.2272px * var(--u)), 0)}
-  20% {transform:translate3d(calc(-3.7752px * var(--u)), calc(-2.9040px * var(--u)), 0)}
-  34% {transform:translate3d(calc( 2.9040px * var(--u)), calc( 2.1780px * var(--u)), 0)}
-  50% {transform:translate3d(calc(-1.8876px * var(--u)), calc(-1.3068px * var(--u)), 0)}
-  66% {transform:translate3d(calc( 1.1616px * var(--u)), calc( 0.7260px * var(--u)), 0)}
-  82% {transform:translate3d(calc(-0.5808px * var(--u)), calc(-0.3630px * var(--u)), 0)}
+  7%  {transform:translate3d(0, calc(5.2272px * var(--su)), 0)}
+  20% {transform:translate3d(calc(-3.7752px * var(--su)), calc(-2.9040px * var(--su)), 0)}
+  34% {transform:translate3d(calc( 2.9040px * var(--su)), calc( 2.1780px * var(--su)), 0)}
+  50% {transform:translate3d(calc(-1.8876px * var(--su)), calc(-1.3068px * var(--su)), 0)}
+  66% {transform:translate3d(calc( 1.1616px * var(--su)), calc( 0.7260px * var(--su)), 0)}
+  82% {transform:translate3d(calc(-0.5808px * var(--su)), calc(-0.3630px * var(--su)), 0)}
   100%{transform:translate3d(0,0,0)}
 }
 
@@ -1081,12 +1088,30 @@ body{
    於是卡面是被「裁掉」而不是被壓扁——參考圖第 3 步那個相互疊掩的樣子。 */
 .day{
   position:relative;height:100%;flex:0 0 auto;width:var(--dayW);overflow:hidden;
-  filter:none;
-  transition:width .6s cubic-bezier(.3,.85,.25,1), filter .35s cubic-bezier(.2,.8,.2,1);
+  filter:none;visibility:visible;
+  transition:width .6s cubic-bezier(.3,.85,.25,1),
+             filter .35s cubic-bezier(.2,.8,.2,1),
+             visibility 0s linear 0s;
 }
+/* ── iOS 的殘影 ──
+   .body 收合時帶 transform，Safari 會把它提升成合成層；一旦提升，祖先的
+   overflow:hidden 就管不住它，.day 的寬度收到 0 之後那一層還留在畫面上，
+   於是天數表收折完仍看得到一塊淡淡的卡面。桌機 Chrome 看不到，只有 iOS 會。
+   兩道保險：
+   (1) clip-path:inset(0) —— 合成層也吃這個裁切。只掛在「非標記天數」上，
+       因為標記天數靠 filter 的外暈，clip-path 會連外暈一起裁掉。
+   (2) 收合結束（.6s 之後）把整張卡 visibility:hidden，展開時延遲 0s 立刻回來。
+       visibility 是離散切換、不會有中間態，所以不影響寬度的補間。 */
+.day:not(.now){clip-path:inset(0)}
+.day .clip{clip-path:inset(0)}
 /* 縮排：除了標記天數以外全部收成 0 寬。#dayRow 是 justify-content:center，
    收完之後標記天數自然落在正中央。 */
-#dayRow.solo .day:not(.now){width:0}
+#dayRow.solo .day:not(.now){
+  width:0;visibility:hidden;
+  transition:width .6s cubic-bezier(.3,.85,.25,1),
+             filter .35s cubic-bezier(.2,.8,.2,1),
+             visibility 0s linear .6s;
+}
 /* 抽屜的裁切窗：寬度固定 --dayW 並靠右對齊（縮排時保留靠中央那一側），
    高度從 100% 收到 35.4%（素材上綠色標籤下緣那條淺色接縫），
    收起後剛好只剩菱形鉚釘＋金上框＋「第 N 天」標籤。 */
@@ -1825,6 +1850,9 @@ const ARROW_SCALE = 1.5;
    十片素材（四角／四邊／頂寶石／底飾）全部吃這一個值，改它就整組等比例縮放。
    壓在 1 以下是因為原圖是 4:3、獎項表接近 5:1，滿高會讓四角與寶石胖到吃掉彩金列與天數表。 */
 const FRAME_SCALE = 0.85;
+/* 撞擊晃動縮放單位 --su 的下限。1 = 手機拿回與桌機相同的絕對晃幅，
+   大於 1 則在小螢幕上再加碼。1.1 是實測「在 iPhone 橫向上明顯感覺得到」的值。 */
+const SLAM_MIN_U = 1.1;
 const FRAME_SRC_H = 710;
 /* 天數卡素材（466x633）上，金色上框橫桿的起始高度佔整張卡的比例。
    這一條以上只有菱形鉚釘，是刻意要壓到獎項框上的那一小塊。 */
@@ -2121,6 +2149,13 @@ function layout(){
 
   const st = document.documentElement.style;
   st.setProperty("--u", u.toFixed(4));
+  /* 撞擊晃動專用的縮放單位。--u 是版面用的，會跟著視窗高一起縮
+     （iPhone 橫向可視高約 390px → u ≈ 0.59，桌機 700px → u ≈ 1.06），
+     晃幅照著縮就等於在手機上砍掉快一半，實機上只剩「輕輕抖一下」。
+     撞擊要的是「感覺得到」而不是「跟版面等比」，所以另開一個下限為 1 的單位：
+     桌機維持原樣，手機補回絕對幅度——相對於較小的獎項表反而更明顯。
+     下限 SLAM_MIN_U 就是這個補償的強度，只調那一個數字即可。 */
+  st.setProperty("--su", Math.max(SLAM_MIN_U, Math.min(1.25, u)).toFixed(4));
   // 獎項表外框：--fk = 原圖 1px 的算繪長度；四角與上下中飾都以它等比例縮放
   const fk = (H * 0.3424) / FRAME_SRC_H * FRAME_SCALE;
   st.setProperty("--fk", fk.toFixed(4) + "px");
