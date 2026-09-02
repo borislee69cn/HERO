@@ -434,24 +434,25 @@ body{
 }
 
 /* 嵌入獎項表的那一拍：整個獎項表（含金屬外框）被撞得晃一下，幅度逐次衰減 */
-/* will-change 只在掛上 .slam 的那 0.5 秒生效：先把兩層拉上合成層，
-   iOS 才不會在第一拍才臨時提升、把最重的那一下吃掉。 */
-#reelWrap.slam,#reelFrame.slam{
-  animation:reelSlam .5s cubic-bezier(.2,.8,.3,1);
-  will-change:transform;
-}
+/* 這裡刻意不加 will-change：在掛 .slam 的同一拍才提升合成層，等於要求瀏覽器
+   在最忙的那一格重做整個獎項表（486 格）的點陣化，iOS 上反而會把前幾格吃掉。 */
+#reelWrap.slam,#reelFrame.slam{animation:reelSlam .58s cubic-bezier(.2,.8,.3,1)}
 /* 幅度較初版累計放大 74%（6.27264 = 3.6 × 1.2 × 1.1 × 1.1 × 1.2，其餘各關鍵影格同倍率）。
    只動幅度、不動時長與衰減比例，撞擊感變重但回穩的節奏和原本一致。
    縮放單位用 --su 而不是 --u，理由見 layout() 裡 --su 的註解：
    --u 在矮視窗上會掉到 0.6 以下，晃幅跟著砍掉快一半，實機只剩輕輕抖一下。 */
+/* 時間軸重新分配：原本首拍峰值落在 7%（0.5s x 7% = 35ms），只夠畫一格，
+   手機錄影實測整段晃動只被畫出「一格」，看起來就像閃了一下而不是晃。
+   改成 .58s、峰值移到 12%（≈70ms），每個極值都撐得住 2~3 格；
+   幅度完全不動，只動時間分配。 */
 @keyframes reelSlam{
   0%  {transform:translate3d(0,0,0)}
-  7%  {transform:translate3d(0, calc(6.27264px * var(--su)), 0)}
-  20% {transform:translate3d(calc(-4.53024px * var(--su)), calc(-3.48480px * var(--su)), 0)}
-  34% {transform:translate3d(calc( 3.48480px * var(--su)), calc( 2.61360px * var(--su)), 0)}
-  50% {transform:translate3d(calc(-2.26512px * var(--su)), calc(-1.56816px * var(--su)), 0)}
-  66% {transform:translate3d(calc( 1.39392px * var(--su)), calc( 0.87120px * var(--su)), 0)}
-  82% {transform:translate3d(calc(-0.69696px * var(--su)), calc(-0.43560px * var(--su)), 0)}
+  12% {transform:translate3d(0, calc(6.27264px * var(--su)), 0)}
+  26% {transform:translate3d(calc(-4.53024px * var(--su)), calc(-3.48480px * var(--su)), 0)}
+  40% {transform:translate3d(calc( 3.48480px * var(--su)), calc( 2.61360px * var(--su)), 0)}
+  54% {transform:translate3d(calc(-2.26512px * var(--su)), calc(-1.56816px * var(--su)), 0)}
+  68% {transform:translate3d(calc( 1.39392px * var(--su)), calc( 0.87120px * var(--su)), 0)}
+  84% {transform:translate3d(calc(-0.69696px * var(--su)), calc(-0.43560px * var(--su)), 0)}
   100%{transform:translate3d(0,0,0)}
 }
 
@@ -808,7 +809,10 @@ body{
   opacity:1;
   /* 顏色統一由 --beamTint 控制，見下方 #board[data-beam] 那組 */
   filter:var(--beamTint, none);
-  transition:opacity .3s ease, filter .55s cubic-bezier(.2,.8,.2,1);
+  /* filter 不做過場：hue-rotate 的補間要逐格重做整條光束層的點陣化，
+     而換色的時機正好壓在撞擊那半秒，手機上會把晃動的影格吃掉。
+     換色改成撞擊瞬間直接切過去，成本只有一次，讀起來也更像被撞出來的。 */
+  transition:opacity .3s ease;
 }
 /* ---------- 分隔光束的顏色 ----------
    素材本身是藍光，四種顏色一律用 hue-rotate 從它位移出來，不另外做四張圖。
@@ -2673,14 +2677,17 @@ async function insertJPCard(tier){
     el2.classList.remove("landed"); void el2.offsetWidth; el2.classList.add("landed");
     setTimeout(() => el2.classList.remove("landed"), 800);
   }
-  // 蓋下的震動：獎項表連同金屬外框一起被撞得晃一下
+  // 蓋下的震動：獎項表連同金屬外框一起被撞得晃一下。
+  // 這一拍只做晃動與換色（換色是瞬切，成本一次），其餘收尾全部延後一格再做——
+  // 手機上如果把擴散光、卡面回收擠在同一格，主執行緒會塞住，
+  // 晃動的頭幾格就會被丟掉，實機看起來只閃了一下。
   slamReel();
-  // 同一拍把格間分隔光束整排換成這一階的代表色（MINI 維持初始的綠）
-  $("#board").dataset.beam = tier;
-  // 嵌入的同一拍：光由該格邊框往四周快速擴散淡出
-  burstCell(tier, rectOf(cell), 400);
-  el.classList.remove("on");
-  a.cancel();
+  $("#board").dataset.beam = tier;   // 格間分隔光束整排換成這一階的代表色
+  requestAnimationFrame(() => {
+    burstCell(tier, rectOf(cell), 400);   // 嵌入光：由該格邊框往四周擴散淡出
+    el.classList.remove("on");
+    a.cancel();
+  });
   await wait(480);                          // 讓落點光收乾淨，再回到自然滾動
 }
 
