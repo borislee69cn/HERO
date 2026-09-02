@@ -487,10 +487,11 @@ body{
   var(--swE2) 84%, var(--swE1) 97%, rgba(255,255,255,.28) 100%)}
 #shockWave.on > i{animation:swOut var(--swDur, 520ms) cubic-bezier(.12,.72,.24,1) forwards}
 @keyframes swOut{
-  0%  {opacity:0;  transform:scaleX(.05)}
-  10% {opacity:.9}
-  55% {opacity:.5}
-  100%{opacity:0;  transform:scaleX(var(--swK, 1))}
+  0%  {opacity:0;   transform:scaleX(.05)}
+  8%  {opacity:1}
+  30% {opacity:.92}
+  62% {opacity:.55}
+  100%{opacity:0;   transform:scaleX(var(--swK, 1))}
 }
 @media (prefers-reduced-motion:reduce){#shockWave{display:none !important}}
 
@@ -2849,10 +2850,15 @@ async function insertJPCard(tier){
   $("#board").dataset.beam = tier;        // 格間分隔光束整排換成這一階的代表色
   const cellBox = rectOf(cell);
   burstCell(tier, cellBox, 400);          // 嵌入光：由該格邊框往四周擴散淡出
-  shockWave(tier, cellBox, 520);          // 震波：與分隔光束同色，往左右推出去後淡掉
   el.classList.remove("on");
   a.cancel();
-  requestAnimationFrame(() => requestAnimationFrame(() => slamReel()));
+  /* 震波跟撞擊晃動綁在同一拍起跑：兩者本來就是同一下撞擊的表現，
+     而且這一拍是特意空出來的乾淨影格——擠在前面那個最忙的 tick 裡，
+     手機上波前的頭幾格會被丟掉，看起來就是「幾乎沒有震波」。 */
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    slamReel();
+    shockWave(tier, cellBox, 520);
+  }));
   await wait(480);                          // 讓落點光收乾淨，再回到自然滾動
 }
 
@@ -2885,18 +2891,25 @@ function burstCell(tier, box, ms){
 function shockWave(tier, box, ms){
   const sw = $("#shockWave"); if (!sw) return;
   const wrap = rectOf($("#reelWrap"));
+  /* 矮視窗補償：手機橫向的 --u 只有 0.59，獎項表高度不到桌機的六成，
+     同一組漸層在小螢幕上看起來會淡很多；加上撞擊那一拍能畫出來的影格本來就少，
+     波前很容易一閃就過去。所以 k 從桌機的 0 漸變到手機的 1，
+     用它同時把亮度抬一級、時長也拉長，讓每一道波都有足夠的影格被看見。 */
+  const k   = Math.min(1, Math.max(0, (0.95 - cssU()) / 0.35));
+  const A   = a => beamTint(tier, Math.min(1, a * (1 + 0.55 * k)));
+  const dur = Math.round(ms * (1 + 0.4 * k));
   sw.style.setProperty("--swX", (box.x - wrap.x + box.w / 2).toFixed(1) + "px");
-  sw.style.setProperty("--swW", (wrap.w * 0.46).toFixed(1) + "px");
-  sw.style.setProperty("--swC1", beamTint(tier, .8));    // 深的那道：前緣
-  sw.style.setProperty("--swC2", beamTint(tier, .16));   //           拖尾
-  sw.style.setProperty("--swD1", beamTint(tier, .42));   // 中的那道：亮度約深的一半
-  sw.style.setProperty("--swD2", beamTint(tier, .09));
-  sw.style.setProperty("--swE1", beamTint(tier, .22));   // 淺的那道：再減半
-  sw.style.setProperty("--swE2", beamTint(tier, .05));
-  sw.style.setProperty("--swDur", ms + "ms");
+  sw.style.setProperty("--swW", (wrap.w * 0.5).toFixed(1) + "px");
+  sw.style.setProperty("--swC1", A(.8));    // 深的那道：前緣
+  sw.style.setProperty("--swC2", A(.16));   //           拖尾
+  sw.style.setProperty("--swD1", A(.42));   // 中的那道：亮度約深的一半
+  sw.style.setProperty("--swD2", A(.09));
+  sw.style.setProperty("--swE1", A(.22));   // 淺的那道：再減半
+  sw.style.setProperty("--swE2", A(.05));
+  sw.style.setProperty("--swDur", dur + "ms");
   sw.classList.remove("on"); void sw.offsetWidth; sw.classList.add("on");
   clearTimeout(sw._h);
-  sw._h = setTimeout(() => sw.classList.remove("on"), ms + 60);
+  sw._h = setTimeout(() => sw.classList.remove("on"), dur + 60);
 }
 
 /* 蓋下的震動：獎項表與金屬外框同步，兩者是兄弟節點，得各自掛一次 */
