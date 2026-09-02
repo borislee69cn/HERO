@@ -1722,8 +1722,10 @@ body{
   background:linear-gradient(180deg,#FFF6C8 6%,#FFD65E 46%,#E0A310 100%);
   border:2px solid #FFF8DC;
   text-shadow:0 1px 0 rgba(255,255,255,.65);
-  /* 呼吸也共用 #btnFire 的 firePulse（box-shadow 由那組關鍵影格全權負責） */
-  animation:firePulse 1.5s ease-in-out infinite .4s;
+  /* 呼吸節奏與 #btnFire 相同（1.5s / ease-in-out / 延遲 .4s），
+     但改掛專屬的 firePulseSoft：只有波峰那一格的亮度降到原本的 90%，
+     谷底與節奏完全不動，#btnFire 維持原本的 firePulse。 */
+  animation:firePulseSoft 1.5s ease-in-out infinite .4s;
 }
 #btnIntroGo:hover,
 #btnResultClose:hover{background:linear-gradient(180deg,#FFFBE0 6%,#FFE288 46%,#F0B41C 100%)}
@@ -1741,6 +1743,21 @@ body{
   box-shadow:inset 0 0 0 max(2px, calc(2.4px * var(--u))) rgba(46,28,6,.62),
              0 0 calc(10px * var(--u)) rgba(255,214,100,.45);
   transition:border-color .2s, box-shadow .2s;
+}
+/* 「前 往 參 加」「領 獎」專用的呼吸：波峰亮度整組下調 10%。
+   谷底（0%/100%）與 firePulse 完全一致，只改 50% 那一格：
+     filter          brightness(1.12) → brightness(1.008)   （1.12 x 0.9）
+     外圈光暈 alpha   .95  → .855                            （亮度 x 0.9）
+     內側反光 alpha   1    → .9                              （亮度 x 0.9）
+   光暈的模糊與擴散半徑不動——那是尺寸不是亮度，動了會連呼吸的幅度一起變。
+   #btnFire（射 擊）仍掛原本的 firePulse，峰值不變。 */
+@keyframes firePulseSoft{
+  0%,100%{box-shadow:0 calc(4px * var(--u)) 0 #7A5606, 0 10px 26px rgba(0,0,0,.55),
+            0 0 22px rgba(255,214,100,.55), inset 0 1px 0 rgba(255,255,255,.9);
+    filter:brightness(1)}
+  50%{box-shadow:0 calc(4px * var(--u)) 0 #7A5606, 0 10px 30px rgba(0,0,0,.55),
+        0 0 46px 8px rgba(255,226,140,.855), inset 0 1px 0 rgba(255,255,255,.9);
+    filter:brightness(1.008)}
 }
 #btnIntroGo:focus-visible,
 #btnResultClose:focus-visible{outline:none}
