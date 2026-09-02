@@ -440,18 +440,18 @@ body{
   animation:reelSlam .5s cubic-bezier(.2,.8,.3,1);
   will-change:transform;
 }
-/* 幅度較初版累計放大 45%（5.2272 = 3.6 × 1.2 × 1.1 × 1.1，其餘各關鍵影格同倍率）。
+/* 幅度較初版累計放大 74%（6.27264 = 3.6 × 1.2 × 1.1 × 1.1 × 1.2，其餘各關鍵影格同倍率）。
    只動幅度、不動時長與衰減比例，撞擊感變重但回穩的節奏和原本一致。
    縮放單位用 --su 而不是 --u，理由見 layout() 裡 --su 的註解：
    --u 在矮視窗上會掉到 0.6 以下，晃幅跟著砍掉快一半，實機只剩輕輕抖一下。 */
 @keyframes reelSlam{
   0%  {transform:translate3d(0,0,0)}
-  7%  {transform:translate3d(0, calc(5.2272px * var(--su)), 0)}
-  20% {transform:translate3d(calc(-3.7752px * var(--su)), calc(-2.9040px * var(--su)), 0)}
-  34% {transform:translate3d(calc( 2.9040px * var(--su)), calc( 2.1780px * var(--su)), 0)}
-  50% {transform:translate3d(calc(-1.8876px * var(--su)), calc(-1.3068px * var(--su)), 0)}
-  66% {transform:translate3d(calc( 1.1616px * var(--su)), calc( 0.7260px * var(--su)), 0)}
-  82% {transform:translate3d(calc(-0.5808px * var(--su)), calc(-0.3630px * var(--su)), 0)}
+  7%  {transform:translate3d(0, calc(6.27264px * var(--su)), 0)}
+  20% {transform:translate3d(calc(-4.53024px * var(--su)), calc(-3.48480px * var(--su)), 0)}
+  34% {transform:translate3d(calc( 3.48480px * var(--su)), calc( 2.61360px * var(--su)), 0)}
+  50% {transform:translate3d(calc(-2.26512px * var(--su)), calc(-1.56816px * var(--su)), 0)}
+  66% {transform:translate3d(calc( 1.39392px * var(--su)), calc( 0.87120px * var(--su)), 0)}
+  82% {transform:translate3d(calc(-0.69696px * var(--su)), calc(-0.43560px * var(--su)), 0)}
   100%{transform:translate3d(0,0,0)}
 }
 
