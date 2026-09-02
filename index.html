@@ -654,11 +654,15 @@ body{
 #reelFrame{
   position:absolute;z-index:8;pointer-events:none;
   left:var(--pad);right:var(--pad);top:27.04%;height:34.24%;
-  filter:drop-shadow(0 calc(2px * var(--u)) calc(7px * var(--u)) rgba(0,0,0,.55));
+  /* 這一層刻意不掛 filter：撞擊晃動是動 #reelFrame 的 transform，
+     只要它自己帶 filter，Safari 就會把整段 transform 動畫打回主執行緒逐格重繪，
+     撞擊那一拍主執行緒一忙就整段掉格。投影改掛在十片素材各自身上，
+     那些片子不會變動，可以被當成靜態圖層快取，外觀幾乎一樣。 */
 }
 #reelFrame > b{
   position:absolute;display:block;
   background-position:center center;background-size:100% 100%;background-repeat:no-repeat;
+  filter:drop-shadow(0 calc(2px * var(--u)) calc(7px * var(--u)) rgba(0,0,0,.55));
 }
 /* 四條直邊：兩端各壓進轉角 1px，避免拉伸後與轉角之間露出髮絲縫。
    來源座標的四條內緣是 x 141 / 1516、y 125 / 835，對齊獎項表的四個邊。 */
@@ -2677,17 +2681,16 @@ async function insertJPCard(tier){
     el2.classList.remove("landed"); void el2.offsetWidth; el2.classList.add("landed");
     setTimeout(() => el2.classList.remove("landed"), 800);
   }
-  // 蓋下的震動：獎項表連同金屬外框一起被撞得晃一下。
-  // 這一拍只做晃動與換色（換色是瞬切，成本一次），其餘收尾全部延後一格再做——
-  // 手機上如果把擴散光、卡面回收擠在同一格，主執行緒會塞住，
-  // 晃動的頭幾格就會被丟掉，實機看起來只閃了一下。
-  slamReel();
-  $("#board").dataset.beam = tier;   // 格間分隔光束整排換成這一階的代表色
-  requestAnimationFrame(() => {
-    burstCell(tier, rectOf(cell), 400);   // 嵌入光：由該格邊框往四周擴散淡出
-    el.classList.remove("on");
-    a.cancel();
-  });
+  /* 順序刻意反過來：先把所有雜事做完（換色、擴散光、卡面回收），
+     空兩格讓主執行緒把這些重繪吃完，最後才起跑撞擊晃動。
+     手機錄影實測，晃動若跟這些工作擠在同一拍，前 150ms 完全不會重繪，
+     首拍那個最重的下沉根本畫不出來，只剩後面回彈的幾格。
+     延後兩格 ≈ 66ms，感官上仍是同一下撞擊。 */
+  $("#board").dataset.beam = tier;        // 格間分隔光束整排換成這一階的代表色
+  burstCell(tier, rectOf(cell), 400);     // 嵌入光：由該格邊框往四周擴散淡出
+  el.classList.remove("on");
+  a.cancel();
+  requestAnimationFrame(() => requestAnimationFrame(() => slamReel()));
   await wait(480);                          // 讓落點光收乾淨，再回到自然滾動
 }
 
