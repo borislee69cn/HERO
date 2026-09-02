@@ -453,7 +453,21 @@ body{
 #shockWave .swL{right:0;transform-origin:100% 50%;
   background:linear-gradient(270deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 52%,
     var(--swC2) 74%, var(--swC1) 94%, rgba(255,255,255,.85) 100%)}
-/* 三道波，一道比一道晚出發、推得近、也更淡：
+/* 最前面還有一道「強震波」（sw0）：獸卡砸下去的那一瞬間衝出來的硬前緣。
+   幾乎全白、極窄、跑得比三道漣漪都快（半個時長就到底）、然後整條消失。
+   它負責「撞擊」的爆發力，後面三道負責「餘波」的層次；
+   標記排在最後面，所以畫在所有波的最上層。 */
+#shockWave .sw0{--swK:1}
+#shockWave.on > i.sw0{
+  animation-duration:calc(var(--swDur, 520ms) * .5);
+  animation-timing-function:cubic-bezier(.05,.85,.2,1);
+}
+#shockWave .sw0.swR{background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 88%,
+  var(--swC1) 96%, rgba(255,255,255,1) 100%)}
+#shockWave .sw0.swL{background:linear-gradient(270deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 88%,
+  var(--swC1) 96%, rgba(255,255,255,1) 100%)}
+
+/* 後面三道波，一道比一道晚出發、推得近、也更淡：
      深（主波）  0ms    scaleX 1     前緣 .80
      中（sw2）  +110ms  scaleX .74   前緣 .42
      淺（sw3）  +220ms  scaleX .52   前緣 .22
@@ -1826,7 +1840,7 @@ body{
     <div id="track"></div>
     <i id="beamLayer" class="sepSync" aria-hidden="true"></i>
     <i id="sepLayer"  class="sepSync" aria-hidden="true"></i>
-    <i id="shockWave" aria-hidden="true"><i class="swL sw3"></i><i class="swR sw3"></i><i class="swL sw2"></i><i class="swR sw2"></i><i class="swL"></i><i class="swR"></i></i>
+    <i id="shockWave" aria-hidden="true"><i class="swL sw3"></i><i class="swR sw3"></i><i class="swL sw2"></i><i class="swR sw2"></i><i class="swL"></i><i class="swR"></i><i class="swL sw0"></i><i class="swR sw0"></i></i>
     <i class="sFX" aria-hidden="true">
       <i class="fxWash"></i>
       <i class="fxEdge e-t"></i>
