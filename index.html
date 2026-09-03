@@ -285,9 +285,11 @@ body{
 #groundFX i{
   position:absolute;left:var(--x);bottom:-8%;display:block;
   width:var(--w);aspect-ratio:1.75;
+  /* 顏色加重：alpha 整體約 1.8x，色相往暖褐推一階（原本偏灰白米色 → 沙塵色），
+     漸層停點不動——只加濃度不加體積，裁切餘裕與升程比例都不受影響。 */
   background:radial-gradient(closest-side,
-      rgba(236,220,186,.30), rgba(232,214,178,.16) 40%,
-      rgba(226,206,168,.05) 72%, rgba(226,206,168,0) 100%);
+      rgba(238,214,168,.54), rgba(231,203,154,.31) 40%,
+      rgba(222,192,140,.11) 72%, rgba(222,192,140,0) 100%);
   opacity:0;will-change:transform,opacity;
   transform:translate3d(-50%,0,0) scale(var(--s0));
   animation:puffRise var(--d) cubic-bezier(.17,.62,.32,1) var(--dl) infinite,
@@ -327,7 +329,7 @@ body{
 #groundFX::after{
   content:"";position:absolute;left:0;right:0;bottom:0;height:40%;
   background:linear-gradient(0deg,
-     rgba(230,212,176,.17), rgba(230,212,176,.06) 52%, rgba(230,212,176,0) 100%);
+     rgba(230,204,162,.30), rgba(230,204,162,.12) 52%, rgba(230,204,162,0) 100%);
   animation:hazeBreath 13s ease-in-out infinite;
 }
 @keyframes hazeBreath{0%,100%{opacity:.75}50%{opacity:1}}
