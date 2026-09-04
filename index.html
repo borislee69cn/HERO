@@ -1642,6 +1642,35 @@ body{
 .rail-btn:hover{background:linear-gradient(180deg,#6B4423,#2A1809);border-color:var(--gold);color:#FFF0BE}
 .rail-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
+/* ---------- 右下角 SKIP：跳過本日演出，直接進結算框 ----------
+   掛在 #quiverWrap 裡、與「出擊」共用 --btnTop 這個基準，所以兩顆鍵永遠同一條水平線；
+   靠右對齊選箭區右緣（= 獎項表右緣）。
+   「出擊」比較高（它是主要按鍵），所以 top 再往下推半個高度差，兩顆鍵是中線對齊而不是上緣對齊。
+   位置落在選箭標記框之下，第 6、7 天的箭位標記與上半段熱區都不會被擋到。 */
+#btnSkip{position:absolute;right:0;top:calc(var(--btnTop) + 6.5px * var(--u));
+  z-index:12;display:flex;align-items:center;gap:calc(6px * var(--u));
+  font-family:inherit;font-size:calc(12px * var(--u));font-weight:800;letter-spacing:.16em;line-height:1;
+  padding:calc(8px * var(--u)) calc(14px * var(--u));border-radius:999px;cursor:pointer;white-space:nowrap;
+  background:linear-gradient(180deg,rgba(62,39,22,.94),rgba(20,11,5,.96));
+  border:1px solid rgba(245,197,66,.42);color:var(--parch);
+  box-shadow:0 calc(2px * var(--u)) calc(10px * var(--u)) rgba(0,0,0,.5),
+             inset 0 1px 0 rgba(255,235,170,.18);
+  backdrop-filter:blur(2px);
+  opacity:0;pointer-events:none;transform:translateY(calc(6px * var(--u)));
+  transition:opacity .25s ease, transform .25s ease, background .2s, border-color .2s, color .2s}
+#btnSkip.show{opacity:.8;pointer-events:auto;transform:none}
+#btnSkip:hover{opacity:1;background:linear-gradient(180deg,#6B4423,#2A1809);
+  border-color:var(--gold);color:#FFF0BE}
+#btnSkip:active{transform:translateY(1px)}
+#btnSkip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+/* ⏭ 圖示：兩個實心三角 + 一根尾桿，全部用 currentColor，跟著文字一起變色 */
+#btnSkip .ic{display:flex;align-items:center;gap:calc(1.5px * var(--u))}
+#btnSkip .ic b{width:0;height:0;border-style:solid;
+  border-width:calc(4.5px * var(--u)) 0 calc(4.5px * var(--u)) calc(5.5px * var(--u));
+  border-color:transparent transparent transparent currentColor}
+#btnSkip .ic u{width:calc(2px * var(--u));height:calc(9px * var(--u));
+  background:currentColor;border-radius:calc(1px * var(--u))}
+
 /* ---------- 彈窗 ---------- */
 .overlay{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
   background:rgba(3,8,5,.82);backdrop-filter:blur(3px);
@@ -2024,6 +2053,9 @@ body{
     <div id="quiverWrap">
       <div id="quiver"></div>
       <button id="btnFire" type="button">出 擊</button>
+      <button id="btnSkip" type="button" aria-label="跳過演出，直接進結算框">
+        <span>SKIP</span><i class="ic" aria-hidden="true"><b></b><b></b><u></u></i>
+      </button>
     </div>
   </div>
 
@@ -2297,7 +2329,35 @@ const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const fmt = n => n.toLocaleString("en-US");
 const board = $("#board");
-const wait = ms => new Promise(r => setTimeout(r, ms));
+/* ---------- SKIP：跳過本日所有演出，直接進結算框 ----------
+   演出是一條很長的 await 鏈（天數宣告 → 彩金解鎖 → 上弦 → 滾輪 → 射箭 → 命中閃爍 → 結算）。
+   要「跳過」而不是「中斷」，最穩的作法是讓這條鏈照原順序跑完、但每一段等待都直接放行：
+   流程仍然只有一條，showResult() 只會被呼叫一次，結算內容與正常演出完全相同，
+   接著的「領獎 → 換日」也照原本的路走，不必另外複製一份收尾邏輯。
+   SKIP.waiters 收的是各段等待的放行函式（wait 的計時器、彩金卡 Web Animations 的 finished、
+   箭矢飛行的結束回呼），按下 SKIP 時一次全部叫醒；showResult() 進場時歸零，下一天恢復原速。 */
+const SKIP = { on:false, waiters:new Set() };
+// SKIP 期間唯一放行的音效：結算相關的報獎／領獎／總結，其餘一律靜音
+const SKIP_KEEP = new Set(["winS", "winL", "winJP", "claim", "finale"]);
+/* 等 p 完成，但 SKIP 期間立刻放行。jump 用來把該段演出補到最終狀態
+   （例如把還在跑的 Web Animations 直接 finish()，避免停在半路的變形上）。 */
+function raceSkip(p, jump){
+  return new Promise(res => {
+    let done = false;
+    const fin = () => { if (done) return; done = true; SKIP.waiters.delete(w); res(); };
+    const w   = () => { if (done) return; if (jump){ try { jump(); } catch(e){} } fin(); };
+    if (SKIP.on) return w();
+    SKIP.waiters.add(w);
+    Promise.resolve(p).then(fin, fin);
+  });
+}
+const wait = ms => new Promise(res => {
+  if (SKIP.on) return res();                       // 已在跳過中：完全不計時
+  let t = 0;
+  const fin = () => { clearTimeout(t); SKIP.waiters.delete(fin); res(); };
+  t = setTimeout(fin, ms);
+  SKIP.waiters.add(fin);                           // 中途按下 SKIP 時由這裡叫醒
+});
 const raf2 = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
 
@@ -2848,6 +2908,7 @@ const SFX_LIB = {
    硬排在 suspended 的 ctx 上，會在 resume 的瞬間全部一起爆出來。 */
 function sfx(name, opt){
   const fn = SFX_LIB[name];
+  if (SKIP.on && !SKIP_KEEP.has(name)) return;     // 跳過演出時，過場音全部不出聲
   if (!fn || !SFX.on || !SFX.ctx || SFX_MUTE[name]) return;
   if (SFX.ctx.state !== "running"){ try { SFX.ctx.resume(); } catch(e){} return; }
   try { fn(SFX.ctx.currentTime + 0.002 + ((opt && opt.at) || 0), opt); } catch(e){}
@@ -2858,7 +2919,7 @@ function sfx(name, opt){
    取樣未就緒才退回合成版——那一版是一支一支上弦，時間抖開。 */
 function sfxNockAll(){
   const n = $$("#quiver .arrow:not(.spent)").length;
-  if (!n || !SFX.on || !SFX.ctx || SFX_MUTE.nockAll) return;
+  if (SKIP.on || !n || !SFX.on || !SFX.ctx || SFX_MUTE.nockAll) return;
   if (SFX.ctx.state === "running" && SMP.nock){
     sfxSample("nock", SFX.ctx.currentTime + 0.002, {
       rate: n >= 4 ? 0.95 : 1.30 - n * 0.07,
@@ -2872,6 +2933,7 @@ function sfxNockAll(){
 
 /* ---- 轉盤循環 ---- */
 function sfxSpinStart(ms){
+  if (SKIP.on) return;
   if (!SFX.on || !SFX.ctx || SFX.ctx.state !== "running" || !SFX.spin || SFX_MUTE.spin) return;
   sfxSpinStop(0.05);
   const t = SFX.ctx.currentTime;
@@ -2901,7 +2963,7 @@ function sfxSpinStart(ms){
   SPIN.src = s; SPIN.gain = g; SPIN.filt = f;
 }
 function sfxSpinDecel(ms){
-  if (!SPIN.src) return;
+  if (SKIP.on || !SPIN.src) return;
   const t = SFX.ctx.currentTime, e = t + ms / 1000;
   const ramp = (p, to, exp) => {
     p.cancelScheduledValues(t);
@@ -3379,6 +3441,7 @@ function centerOffset(i){
   return w/2 - (i*STEP + (STEP - parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gap")))/2);
 }
 function setTrack(x, ms, easing){
+  if (SKIP.on) ms = 0;                     // 跳過演出：盤面直接就位，不跑滾動轉場
   const t = $("#track");
   t.style.transition = ms ? `transform ${ms}ms ${easing || "linear"}` : "none";
   t.style.transform = `translateX(${x}px)`;
@@ -3689,13 +3752,13 @@ async function insertJPCard(tier){
     { transform:"scale(1)", opacity:1, offset:1 }               // 收進獎項格
   ], { duration:CFG.jpInsertMs, fill:"forwards" });
 
-  await a.finished;
+  await raceSkip(a.finished, () => { try { a.finish(); } catch(e){} });
   clearTimeout(flashTimer);
   el.classList.remove("flash");
   // 交棒：飛入的那張就地換成格內卡面，不重播進場、也不會多出一格
   releaseJPCards(tier);
   const el2 = $$("#track .panel")[CFG.anchorIdx];
-  if (el2){
+  if (el2 && !SKIP.on){
     // 落點光效換成該階彩金的代表色，白光只留撞擊那一瞬的高光
     el2.style.setProperty("--jpc", jpTint(tier, .95));
     el2.style.setProperty("--jpcSoft", jpTint(tier, .5));
@@ -3715,7 +3778,7 @@ async function insertJPCard(tier){
   /* 震波跟撞擊晃動綁在同一拍起跑：兩者本來就是同一下撞擊的表現，
      而且這一拍是特意空出來的乾淨影格——擠在前面那個最忙的 tick 裡，
      手機上波前的頭幾格會被丟掉，看起來就是「幾乎沒有震波」。 */
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  if (!SKIP.on) requestAnimationFrame(() => requestAnimationFrame(() => {
     slamReel();
     shockWave(tier, cellBox, 520);
     sfx("jpSlam");                        // 地震撞擊，同時把 BGM 壓下去讓路
@@ -3726,6 +3789,7 @@ async function insertJPCard(tier){
 /* 嵌入光：一圈貼齊該格邊框的光框，往四周撐開並淡出。
    box 給獎項格的矩形，ms 是全長（刻意短，撞擊感才不會拖泥帶水）。 */
 function burstCell(tier, box, ms){
+  if (SKIP.on) return;
   const cb = $("#cellBurst");
   if (!cb) return;
   const u = cssU();
@@ -3750,6 +3814,7 @@ function burstCell(tier, box, ms){
    容器只是個寬度 0 的錨點，左右兩片的寬度給獎項表寬的 46%，
    推到獎項表邊緣前就已經淡完，不會出現硬生生被裁掉的邊。 */
 function shockWave(tier, box, ms){
+  if (SKIP.on) return;
   const sw = $("#shockWave"); if (!sw) return;
   const wrap = rectOf($("#reelWrap"));
   /* 矮視窗補償：手機橫向的 --u 只有 0.59，獎項表高度不到桌機的六成，
@@ -3775,6 +3840,7 @@ function shockWave(tier, box, ms){
 
 /* 蓋下的震動：獎項表與金屬外框同步，兩者是兄弟節點，得各自掛一次 */
 function slamReel(){
+  if (SKIP.on) return;
   [$("#reelWrap"), $("#reelFrame")].forEach(el => {
     if (!el) return;
     el.classList.remove("slam"); void el.offsetWidth; el.classList.add("slam");
@@ -3867,9 +3933,27 @@ function setReady(on){
     a.classList.toggle("ready", eligible);
   });
 }
+/* 代按一次「出擊」：SKIP 用。自選日若還沒選滿，先由中央往外補到需要的支數，
+   不然放行之後流程會拿到一組不足額的箭位。 */
+function releaseFire(){
+  if (!fireResolve) return false;
+  if (S.picking && S.picks.length < S.pickNeed){
+    autoSlots(S.pickNeed).forEach(i => {
+      if (S.picks.length < S.pickNeed && !S.picks.includes(i)) S.picks.push(i);
+    });
+  }
+  showFire(false);
+  const r = fireResolve; fireResolve = null; r();
+  return true;
+}
 function waitFire(autoShow = true){
-  if (autoShow){ showFire(true); setReady(true); }
-  return new Promise(r => { fireResolve = r; });
+  if (autoShow && !SKIP.on){ showFire(true); setReady(true); }
+  const p = new Promise(r => { fireResolve = r; });
+  /* 在 SKIP 之後才走到這一步（例如按下去時還停在天數宣告）：
+     這顆 Promise 是在 doSkip() 放行之後才建立的，沒有人會叫醒它，
+     所以在這裡自己放行，流程才不會卡在「等玩家按出擊」。 */
+  if (SKIP.on) releaseFire();
+  return p;
 }
 $("#btnFire").addEventListener("click", () => {
   if (!fireResolve) return;
@@ -3956,6 +4040,54 @@ function togglePick(i){
   showFire(full);
 }
 
+/* ---- SKIP 按鍵 ----
+   showSkip()  演出期間才亮；進結算框、七日總結、開場窗都收起來
+   skipEnd()   回到正常速度（結算框一出現就呼叫，下一天照常演出）
+   doSkip()    按下去：把畫面上還在跑的東西一次收乾淨，再叫醒所有等待 */
+function showSkip(on){
+  const b = $("#btnSkip");
+  if (b) b.classList.toggle("show", !!on && !SKIP.on);
+}
+function skipEnd(){
+  SKIP.on = false;
+  SKIP.waiters.clear();
+  clearTimeout(skipEnd._h);
+  showSkip(false);
+}
+function doSkip(){
+  if (SKIP.on || !S.run) return;
+  if (["resultOverlay", "finalOverlay", "introOverlay"]
+      .some(id => $("#" + id).classList.contains("show"))) return;
+
+  SKIP.on = true;
+  showSkip(false);
+
+  // 畫面上還在跑的演出一次收乾淨（各自的計時器在下面被叫醒後才會收尾，這裡先把殘影拿掉）
+  clearDaySeq(); setDayRow(true, true);          // 天數表直接跳到收合完成的常駐狀態
+  stopIdle();
+  sfxSpinStop(0.05);
+  $("#dayCall").classList.remove("show");
+  $("#archerCut").classList.remove("flash");
+  $("#cardFly").classList.remove("on", "flash");
+  $("#shockWave").classList.remove("on");
+  const cb = $("#cellBurst");
+  if (cb){ clearTimeout(cb._h); cb.classList.remove("on"); }
+  $("#reelWrap").classList.remove("streaking", "streak-ease", "streak-out", "settling", "slam");
+  $("#reelFrame").classList.remove("slam");
+  $("#flyers").innerHTML = "";
+
+  // 還停在「等玩家按出擊」那一步：代按一次
+  releaseFire();
+
+  // 其餘所有等待（計時器、彩金卡動畫、箭矢飛行）一次放行，流程會一路衝到 showResult()
+  const ws = [...SKIP.waiters]; SKIP.waiters.clear();
+  ws.forEach(f => { try { f(); } catch(e){} });
+
+  // 保險：萬一這一輪半途被「重新播放」之類的動作打斷，4 秒後自動解除跳過狀態
+  clearTimeout(skipEnd._h);
+  skipEnd._h = setTimeout(() => { if (SKIP.on) skipEnd(); }, 4000);
+}
+
 function waitResultClose(){ return new Promise(r => { resultResolve = r; }); }
 $("#btnResultClose").addEventListener("click", () => {
   sfx("claim");
@@ -3966,7 +4098,9 @@ $("#btnResultClose").addEventListener("click", () => {
 /* ============================================================
    8. 射擊演出
    ============================================================ */
-async function fireVolley(slotList){
+/* token 與 runDay() 同一個：中途按下「重新播放」或開新一輪時，
+   這條射擊演出必須自己作廢，否則舊的一輪會在新一輪頭上再彈一次結算框。 */
+async function fireVolley(slotList, token){
   stopIdle();                        // 進入演出，交還控制權
   const shots = slotList.slice().sort((a,b) => a - b);
   shots.forEach(i => { S.slots[i].spent = true; });
@@ -3987,28 +4121,36 @@ async function fireVolley(slotList){
   const rw = $("#reelWrap");
   setTrack(finalX - (D1 + D2), 0);
   await raf2();
+  if (token !== S.run) return;
   rw.classList.remove("streak-ease", "streak-out");
-  rw.classList.add("streaking");                      // 上下框開始抽速度線
+  if (!SKIP.on) rw.classList.add("streaking");        // 上下框開始抽速度線
   sfxSpinStart(420);                                  // 齒輪音床跟著加速，音高由 playbackRate 帶
   setTrack(finalX - D2, T1, "linear");                // 起步即全速
   const cutAt = Math.min(CFG.cutAtMs, CFG.spinMs - 1000);   // 表演全長 .95s，須在停輪前結束
-  setTimeout(() => {                                  // 射擊後約 1 秒閃入，全長約 0.95 秒
+  const cutTimer = setTimeout(() => {                 // 射擊後約 1 秒閃入，全長約 0.95 秒
+    if (SKIP.on) return;
     const el = $("#archerCut");
     el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
   }, cutAt);
   await wait(T1);
+  if (token !== S.run){ clearTimeout(cutTimer); return; }
   setTrack(finalX, CFG.decelMs, CFG.decelEase);       // 漸慢停輪：最後一格用爬的滑進來
   sfxSpinDecel(CFG.decelMs);                          // 齒輪跟著慢下來，音量留到最後半秒才收
   rw.classList.add("streak-ease");                    // 轉速一洩，線束跟著轉稀
   // 光束不留到停輪：轉稀後隨即快速淡出，約在停輪前 1.5 秒收乾淨
   const streakOutAt = Math.min(CFG.streakOutMs, Math.max(0, CFG.decelMs - 600));
-  const streakTimer = setTimeout(() => rw.classList.add("streak-out"), streakOutAt);
+  const streakTimer = setTimeout(() => { if (!SKIP.on) rw.classList.add("streak-out"); }, streakOutAt);
   // 停輪前的「屏息」：轉盤框微微搏動，強化獎項快到位卻可能溜走的懸念
   const settleAt = Math.max(0, CFG.decelMs - CFG.settleLeadMs);
-  const settleTimer = setTimeout(() => { rw.classList.add("settling"); sfx("tension"); }, settleAt);
+  const settleTimer = setTimeout(() => {
+    if (SKIP.on) return;
+    rw.classList.add("settling"); sfx("tension");
+  }, settleAt);
   await wait(CFG.decelMs + 120);
   clearTimeout(settleTimer);
   clearTimeout(streakTimer);
+  clearTimeout(cutTimer);
+  if (token !== S.run) return;
   sfxSpinStop(0.10);
   rw.classList.remove("settling", "streaking", "streak-ease", "streak-out");
 
@@ -4017,6 +4159,7 @@ async function fireVolley(slotList){
   const cardsGone = dissolveCards();
   await flyArrows(shots);
   await cardsGone;                   // 卡面完全散盡，才輪到獎項亮相
+  if (token !== S.run) return;
 
   // 命中閃爍約 2 秒後才宣告結算
   const panels = $$("#track .panel");
@@ -4028,6 +4171,7 @@ async function fireVolley(slotList){
   if (jpHit) renderJP(jpHit.jp);
   sfx("hitFlash");
   await wait(CFG.hitFlashMs);
+  if (token !== S.run) return;
 
   const results = prizes.map((p, n) => ({ ...settle(p), slot:shots[n] }));
   results.forEach(addTally);
@@ -4040,6 +4184,7 @@ async function fireVolley(slotList){
 
 // 全部箭同時、垂直向上飛出：推進至獎項表頂線後，由箭頭至箭尾淡出消失
 function flyArrows(slots){
+  if (SKIP.on) return Promise.resolve();   // 跳過演出：箭不飛，直接算命中
   return new Promise(res => {
     const box   = $("#flyers");
     const reel  = rectOf($("#reelWrap"));
@@ -4112,7 +4257,7 @@ function flyArrows(slots){
           el.style.transform  = `translate(${x}px, ${-afh * 1.05}px)`;
         });
       }, CFG.flyMs + 20);
-      setTimeout(res, CFG.flyMs + 60);
+      wait(CFG.flyMs + 60).then(res);     // 用 skip 感知的 wait，中途按下 SKIP 也放得掉
     }));
   });
 }
@@ -4160,6 +4305,7 @@ function heroHTML(results){
 }
 
 function showResult(results){
+  skipEnd();                       // 已經抵達結算框：跳過狀態結束，下一天恢復正常演出
   const l = results[0].level, k = results.length;
   $("#resultSub").textContent = `第 ${S.day} 天 · ${k} 箭齊發 · ${l.lv}`;
 
@@ -4224,6 +4370,7 @@ function dayCall(d, tier){
 }
 
 async function runDay(d, token){
+  showSkip(true);                  // 本日演出開始，右下角 SKIP 亮起
   S.day = d; S.picks = []; S.picking = false;
   S.slots = Array(CFG.slots).fill(null);
   renderQuiver();
@@ -4311,7 +4458,7 @@ async function runDay(d, token){
     if (token !== S.run) return;
   }
 
-  await fireVolley(order);
+  await fireVolley(order, token);
   if (token !== S.run) return;
 
   if (d < CFG.arrowsPerDay.length){
@@ -4320,6 +4467,7 @@ async function runDay(d, token){
     runDay(d + 1, token);
   } else {
     renderDays();
+    showSkip(false);               // 七日總結沒有演出可跳
     $$(".day").forEach(el => el.classList.add("done"));
     $("#quiverLabel").textContent = "七日活動已完成";
     startIdle();
@@ -4339,6 +4487,7 @@ function startRun(){
   S.unlocked.clear();
   S.slots = Array(CFG.slots).fill(null);
   fireResolve = resultResolve = null;
+  skipEnd();                                // 重新開跑前把跳過狀態清乾淨
   showFire(false);
   delete $("#board").dataset.beam;          // 分隔光束回到初始的金黃
   $("#shockWave").classList.remove("on");   // 震波殘留的狀態一併清掉
@@ -4361,6 +4510,7 @@ $("#btnSfx").addEventListener("click", () => {
   renderSfxMenu(); $("#sfxOverlay").classList.add("show");
 });
 bindSfxMenu();
+$("#btnSkip").addEventListener("click", doSkip);
 $("#btnReplay").addEventListener("click", startRun);
 $("#btnFinalClose").addEventListener("click", () => { $("#finalOverlay").classList.remove("show"); startRun(); });
 $("#btnTable").addEventListener("click", () => $("#tableOverlay").classList.add("show"));
