@@ -1648,21 +1648,58 @@ body{
   border-top:1px solid rgba(245,197,66,.3);width:100%}
 #dayCallJP.show{display:flex;animation:jpLineIn .5s ease-out .35s backwards}
 @keyframes jpLineIn{from{opacity:0;transform:translateY(calc(8px * var(--u)))}}
+/* 階名牌與「彩金區解鎖」依階分色，與分隔光束／引信同一套：
+   --jpR 是該階的 rgb 三元組（由 dayCall() 依 BEAM_RGB 寫進來），
+   牌底是同色系的深→亮漸層、外框與字用亮色，MINI 亮綠／MINOR 亮藍／MAJOR 亮紫／GRAND 亮紅。 */
+#dayCallJP{--jpR:236,86,224}
 #dayCallJP .tier{
-  font-size:calc(22px * var(--u));font-weight:800;letter-spacing:.2em;color:#FFF0BE;
-  text-shadow:0 0 16px rgba(255,120,160,.9), 0 0 30px rgba(245,197,66,.6);
+  font-size:calc(22px * var(--u));font-weight:800;letter-spacing:.2em;color:#FFFFFF;
+  text-shadow:0 0 16px rgba(var(--jpR),.95), 0 0 30px rgba(var(--jpR),.6);
   padding:calc(3px * var(--u)) calc(20px * var(--u));border-radius:3px;
-  background:linear-gradient(180deg,#8E1F3A,#3A0714);border:1px solid #FF9DB4;
+  background:linear-gradient(180deg, rgba(var(--jpR),.92), rgba(var(--jpR),.38)),
+             linear-gradient(180deg,#1A1A1A,#050505);
+  border:1px solid rgba(var(--jpR),1);
+  box-shadow:0 0 14px rgba(var(--jpR),.55), inset 0 1px 0 rgba(255,255,255,.35);
 }
 /* 「第 N 天」48px、「本日 N 箭」與「彩金區解鎖」18px、後兩者粗體。
    原本最上面那行「連 續 登 入」已整個移除，標記與這裡的樣式都不留。
    MINI／MINOR／MAJOR／GRAND 那塊階名牌維持原大小。 */
-#dayCallJP .txt{font-size:calc(18px * var(--u));font-weight:800;letter-spacing:.3em;color:#E58AA8;
+#dayCallJP .txt{font-size:calc(18px * var(--u));font-weight:800;letter-spacing:.3em;
+  color:rgb(var(--jpR));text-shadow:0 0 10px rgba(var(--jpR),.6);
   margin-top:calc(5px * var(--u));white-space:nowrap}
 #dayCall .big{font-size:calc(48px * var(--u));font-weight:800;letter-spacing:.22em;margin-top:calc(3px * var(--u));line-height:1.15;
   background:linear-gradient(180deg,#FFF8DC 10%,#F5C542 52%,#9A6B12 96%);
   -webkit-background-clip:text;background-clip:text;color:transparent;white-space:nowrap}
 #dayCall .foot{font-size:calc(18px * var(--u));font-weight:800;letter-spacing:.24em;color:var(--fletch);margin-top:4px;white-space:nowrap}
+
+/* ---------- 炸彈引信（彩金解鎖日的宣告彈窗） ----------
+   #dayFuse 是 #dayCall 的兄弟節點、同一個定位方式，尺寸與位置由 JS 對齊彈窗矩形，
+   四邊各多留 --fzPad 給火花與光暈；路徑本身畫在彈窗邊框的中線上。
+   不放進 #dayCall 裡是因為它 overflow:hidden，會把邊框上的火花整個裁掉。
+   .fz-burn / .fz-core：燒過的那一段（pathLength=1，dasharray 由 JS 逐格推進）；
+   burn 是寬的橘紅光暈、core 是細的亮白芯，兩層疊起來才有「燒著」的感覺。
+   .fz-head：兩顆引信火頭；.fz-sparks：噴出來的碎火星；.fz-meet：會合時的閃光。 */
+#dayFuse{position:absolute;left:50%;top:44.16%;transform:translate(-50%,-50%);z-index:27;
+  pointer-events:none;display:none;overflow:visible;
+  --fzC1:#FFF3C4;--fzC2:#FFB347;--fzC3:#FF5A1F}   /* 預設金色；解鎖時由 JS 依階別覆寫 */
+#dayFuse.on{display:block}
+#dayFuse path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+#dayFuse .fz-track{stroke:rgba(255,120,40,.0)}
+/* 三層燒痕：halo 寬而淡的外暈、burn 橘紅主體、core 亮白細芯 */
+#dayFuse .fz-halo{stroke:var(--fzC3);stroke-width:18;opacity:.45;filter:url(#fzGlowW)}
+#dayFuse .fz-burn{stroke:var(--fzC2);stroke-width:6;opacity:1;filter:url(#fzGlow)}
+#dayFuse .fz-core{stroke:var(--fzC1);stroke-width:2.2}
+#dayFuse .fz-hglow{fill:var(--fzC2);opacity:.75;filter:url(#fzGlowW)}
+#dayFuse .fz-head{fill:#FFFFFF;filter:url(#fzGlow)}
+#dayFuse .fz-sparks circle{fill:var(--fzC1)}
+#dayFuse .fz-sparks circle:nth-child(odd){fill:var(--fzC2)}
+#dayFuse .fz-meet{fill:var(--fzC1);opacity:0}
+/* 會合後（.done）整圈燒痕維持亮著並輕微呼吸，彈窗淡出（.out）時才跟著淡掉 */
+#dayFuse.done .fz-burn{animation:fzBreath .5s ease-in-out infinite alternate}
+@keyframes fzBreath{from{opacity:1}to{opacity:.72}}
+#dayFuse.out .fz-halo,#dayFuse.out .fz-burn,#dayFuse.out .fz-core{animation:fzFade .4s ease-out forwards}
+@keyframes fzFade{to{opacity:0}}
+@media (prefers-reduced-motion:reduce){#dayFuse{display:none !important}}
 
 /* ---------- 左上角功能鍵（由左至右） ---------- */
 #sideRail{position:absolute;left:var(--pad);top:calc(var(--bh) * .028);z-index:5;
@@ -2119,6 +2156,22 @@ body{
     <div class="foot" id="dayCallFoot"></div>
     <div id="dayCallJP"><span class="tier"></span><span class="txt">彩金區解鎖</span></div>
   </div>
+  <!-- 炸彈引信：彩金解鎖日，宣告彈窗的邊框由底部中央分左右兩路引燃、在頂部中央會合，
+       接著才是獸卡彈出。與 #dayCall 同位置，尺寸由 JS 依彈窗實際矩形給定。 -->
+  <svg id="dayFuse" aria-hidden="true">
+    <defs><filter id="fzGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.2"/></filter>
+      <filter id="fzGlowW" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6"/></filter></defs>
+    <path class="fz-track"/>
+    <path class="fz-halo fz-L" pathLength="1"/><path class="fz-halo fz-R" pathLength="1"/>
+    <path class="fz-burn fz-L" pathLength="1"/><path class="fz-burn fz-R" pathLength="1"/>
+    <path class="fz-core fz-L" pathLength="1"/><path class="fz-core fz-R" pathLength="1"/>
+    <g class="fz-sparks"></g>
+    <circle class="fz-hglow fz-gL" r="0"/><circle class="fz-hglow fz-gR" r="0"/>
+    <circle class="fz-head fz-hL" r="0"/><circle class="fz-head fz-hR" r="0"/>
+    <circle class="fz-meet" r="0"/>
+  </svg>
 
   <div id="toast"></div>
  </div>
@@ -2326,6 +2379,9 @@ const BEAM_RGB = {
   MAJOR:"236,86,224", GRAND:"255,78,64"
 };
 const beamTint = (t, a) => `rgba(${BEAM_RGB[t] || "255,178,46"},${a})`;
+// 該階光束色往白調亮 k（0~1），回傳 "r,g,b" 三元組，給 CSS 的 rgba(var(--x),a) 用
+const lightRGB = (t, k) => (BEAM_RGB[t] || "255,178,46").split(",").map(Number)
+  .map(v => Math.round(v + (255 - v) * k)).join(",");
 const jpTint = (t, a) => `rgba(${jpRGB(t)},${a})`;
 const JP_GLOW = Object.fromEntries(Object.keys(JP_RGB).map(t => [t, jpTint(t, .55)]));
 const CN = ["一","二","三","四","五","六","七"];
@@ -4163,6 +4219,7 @@ function doSkip(){
   stopIdle();
   sfxSpinStop(0.05);
   $("#dayCall").classList.remove("show");
+  clearTimeout(dayCall._fz); clearTimeout(dayCall._fzOut); fuseEnd();   // 引信一併收掉
   $("#archerCut").classList.remove("flash");
   $("#cardFly").classList.remove("on", "flash");
   $("#shockWave").classList.remove("on");
@@ -4562,13 +4619,130 @@ function dayCall(d, tier){
   const jpEl = $("#dayCallJP");
   jpEl.querySelector(".tier").textContent = tier || "";
   jpEl.classList.toggle("show", !!tier);
+  // 階名牌與「彩金區解鎖」的顏色跟該階光束同色（見 #dayCallJP 的註解）
+  if (tier) jpEl.style.setProperty("--jpR", lightRGB(tier, .25));
 
   const ms = CFG.callMs + (tier ? CFG.unlockMs : 0);
   const el = $("#dayCall");
   el.style.setProperty("--callDur", ms + "ms");
   el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
   sfx("dayCall");
-  return wait(ms).then(() => el.classList.remove("show"));
+  /* 解鎖日：彈窗一出現引信就同步點著（等 callIn 的 12% 進場放大結束，矩形才量得準），
+     由頂邊中央分左右往下燒，全長算到彈窗開始淡出（callIn 的 85%）那一刻，
+     正好在底邊中央會合；會合閃光接著就是獸卡彈出。顏色依該階彩金光束分色。 */
+  if (tier && !SKIP.on){
+    const at = Math.round(ms * 0.12), fadeAt = Math.round(ms * 0.85);
+    // 引信速度再加 50%：全長 = 原本（起燒到淡出）的 1/1.5，提早會合；
+    // 會合後燒痕整圈維持亮著，等彈窗開始淡出那一拍才跟著淡掉
+    const fuseMs = Math.round((fadeAt - at) / 1.5);
+    clearTimeout(dayCall._fz); clearTimeout(dayCall._fzOut);
+    dayCall._fz = setTimeout(() => { if (el.classList.contains("show")) fuseRun(fuseMs, tier); }, at);
+    dayCall._fzOut = setTimeout(() => $("#dayFuse").classList.add("out"), fadeAt);
+  }
+  return wait(ms).then(() => { el.classList.remove("show"); fuseEnd(); });
+}
+
+/* 炸彈引信：兩顆火頭由彈窗頂邊中央出發，各自沿邊框往左／往右跑，
+   繞過兩個上角、沿左右邊往下、繞過下角，在底邊中央會合閃一下。
+   路徑用 SVG 圓角矩形拆成左右兩段，起點都在頂邊中央、終點都在底邊中央，
+   燒痕與光暈的顏色由 tier 帶入，與獎項表分隔光束同一套色（MINI 綠／MINOR 藍／MAJOR 紫／GRAND 紅），
+   燒過的段落用 stroke-dasharray（pathLength 正規化為 1）逐格推進，
+   火頭位置以 getPointAtLength 取樣，沿路隨機噴碎火星（帶重力、快速熄滅）。 */
+function fuseRun(ms, tier){
+  const fz = $("#dayFuse"), dc = $("#dayCall");
+  if (!fz || !dc) return;
+  // 細芯／火星用該階色調亮六成（與白混色），主體與外暈用原色
+  const rgb = (BEAM_RGB[tier] || "255,178,46").split(",").map(Number);
+  fz.style.setProperty("--fzC1", `rgb(${rgb.map(v => Math.round(v + (255 - v) * .6)).join(",")})`);
+  fz.style.setProperty("--fzC2", beamTint(tier, .95));                            // 燒痕主體
+  fz.style.setProperty("--fzC3", beamTint(tier, .7));                             // 外暈
+  const b = board.getBoundingClientRect(), r = dc.getBoundingClientRect();
+  const u = cssU(), PAD = 26 * u;
+  const W = r.width, H = r.height, rx = 6 * u, bw = 2;              // 邊框 2px，路徑走中線
+  fz.style.left = (r.left - b.left + W / 2) + "px";
+  fz.style.top  = (r.top  - b.top  + H / 2) + "px";
+  fz.style.width  = (W + PAD * 2) + "px";
+  fz.style.height = (H + PAD * 2) + "px";
+  fz.setAttribute("viewBox", `0 0 ${W + PAD * 2} ${H + PAD * 2}`);
+  const x0 = PAD + bw / 2, y0 = PAD + bw / 2, x1 = PAD + W - bw / 2, y1 = PAD + H - bw / 2;
+  const cx = (x0 + x1) / 2, rr = Math.max(1, rx - bw / 2);
+  // 左半：頂中 → 左上角 → 左邊往下 → 左下角 → 底中
+  const dL = `M${cx},${y0} H${x0 + rr} A${rr},${rr} 0 0 0 ${x0},${y0 + rr} V${y1 - rr} A${rr},${rr} 0 0 0 ${x0 + rr},${y1} H${cx}`;
+  // 右半：頂中 → 右上角 → 右邊往下 → 右下角 → 底中
+  const dR = `M${cx},${y0} H${x1 - rr} A${rr},${rr} 0 0 1 ${x1},${y0 + rr} V${y1 - rr} A${rr},${rr} 0 0 1 ${x1 - rr},${y1} H${cx}`;
+  fz.querySelectorAll(".fz-L").forEach(p => p.setAttribute("d", dL));
+  fz.querySelectorAll(".fz-R").forEach(p => p.setAttribute("d", dR));
+  const track = fz.querySelector(".fz-track"); track.setAttribute("d", dL);
+  const burns = fz.querySelectorAll(".fz-burn, .fz-halo"), cores = fz.querySelectorAll(".fz-core");
+  const pL = fz.querySelector(".fz-core.fz-L"), pR = fz.querySelector(".fz-core.fz-R");
+  const hL = fz.querySelector(".fz-hL"), hR = fz.querySelector(".fz-hR"), meet = fz.querySelector(".fz-meet");
+  const gL = fz.querySelector(".fz-gL"), gR = fz.querySelector(".fz-gR");
+  const sparks = fz.querySelector(".fz-sparks"); sparks.innerHTML = "";
+  const lenL = pL.getTotalLength(), lenR = pR.getTotalLength();
+  [...burns, ...cores].forEach(p => { p.setAttribute("stroke-dasharray", "0 1"); p.style.opacity = ""; });
+  fz.classList.remove("done", "out"); fz.classList.add("on");
+  meet.setAttribute("r", 0); meet.style.opacity = 0;
+  const parts = [];
+  const t0 = performance.now(); let last = t0;
+  const headR = 4.2 * u;
+  function emit(pt, dir){
+    const n = 3 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++){
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("r", (0.9 + Math.random() * 1.8) * u);
+      sparks.appendChild(c);
+      const a = Math.random() * Math.PI * 2, v = (0.9 + Math.random() * 2.2) * u;
+      parts.push({ el:c, x:pt.x, y:pt.y, vx:Math.cos(a) * v - dir * 0.5 * u, vy:Math.sin(a) * v - 0.9 * u,
+                   life:0.22 + Math.random() * 0.28, age:0 });
+    }
+  }
+  function frame(now){
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const p = Math.min(1, (now - t0) / ms);
+    // 引信近乎等速、末段略加速衝向會合點
+    const e = p < 1 ? p * 0.82 + Math.pow(p, 3) * 0.18 : 1;
+    [...burns, ...cores].forEach(q => q.setAttribute("stroke-dasharray", `${e} 1`));
+    const ptL = pL.getPointAtLength(e * lenL), ptR = pR.getPointAtLength(e * lenR);
+    hL.setAttribute("cx", ptL.x); hL.setAttribute("cy", ptL.y);
+    hR.setAttribute("cx", ptR.x); hR.setAttribute("cy", ptR.y);
+    const flick = headR * (0.85 + Math.random() * 0.4);
+    hL.setAttribute("r", p < 1 ? flick : 0); hR.setAttribute("r", p < 1 ? flick : 0);
+    gL.setAttribute("cx", ptL.x); gL.setAttribute("cy", ptL.y); gL.setAttribute("r", p < 1 ? flick * 3 : 0);
+    gR.setAttribute("cx", ptR.x); gR.setAttribute("cy", ptR.y); gR.setAttribute("r", p < 1 ? flick * 3 : 0);
+    if (p < 1 && Math.random() < 0.9){ emit(ptL, -1); emit(ptR, 1); }
+    for (let i = parts.length - 1; i >= 0; i--){
+      const q = parts[i]; q.age += dt;
+      if (q.age >= q.life){ q.el.remove(); parts.splice(i, 1); continue; }
+      q.vy += 4.5 * u * dt; q.x += q.vx * dt * 60; q.y += q.vy * dt * 60;
+      q.el.setAttribute("cx", q.x); q.el.setAttribute("cy", q.y);
+      q.el.setAttribute("opacity", 1 - q.age / q.life);
+    }
+    if (p >= 1 && !frame.met){
+      frame.met = true;
+      // 會合：底邊中央炸一下亮光，燒痕接著淡掉
+      const top = pL.getPointAtLength(lenL);
+      meet.setAttribute("cx", top.x); meet.setAttribute("cy", top.y);
+      meet.style.transition = "none"; meet.setAttribute("r", 6 * u); meet.style.opacity = 1;
+      requestAnimationFrame(() => {
+        meet.style.transition = "r .3s ease-out, opacity .3s ease-out";
+        meet.setAttribute("r", 40 * u); meet.style.opacity = 0;
+      });
+      gL.setAttribute("r", 0); gR.setAttribute("r", 0);
+      fz.classList.add("done");
+      for (let i = 0; i < 22; i++) emit(top, i % 2 ? 1 : -1);
+      frame.endAt = now + 480;
+    }
+    // 會合後只剩火星要跑完；燒痕留在畫面上，由 dayCall 在彈窗淡出時掛 .out、結束時 fuseEnd()
+    if (!frame.met || now < frame.endAt || parts.length) fuseRun._raf = requestAnimationFrame(frame);
+  }
+  cancelAnimationFrame(fuseRun._raf);
+  fuseRun._raf = requestAnimationFrame(frame);
+}
+function fuseEnd(){
+  cancelAnimationFrame(fuseRun._raf);
+  const fz = $("#dayFuse"); if (!fz) return;
+  fz.classList.remove("on", "done", "out");
+  fz.querySelector(".fz-sparks").innerHTML = "";
 }
 
 async function runDay(d, token){
